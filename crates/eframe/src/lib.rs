@@ -194,7 +194,7 @@ mod native;
 #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
 pub use native::run::EframeWinitApplication;
 
-#[cfg(not(any(target_arch = "wasm32", target_os = "ios")))]
+#[cfg(not(any(target_arch = "wasm32", target_os = "ios", target_env = "ohos")))]
 #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
 pub use native::run::EframePumpStatus;
 
@@ -256,7 +256,7 @@ pub mod icon_data;
 pub fn run_native(
     app_name: &str,
     mut native_options: NativeOptions,
-    app_creator: AppCreator<'_>,
+    app_creator: AppCreator<'static>,
 ) -> Result {
     let renderer = init_native(app_name, &mut native_options);
 
@@ -281,22 +281,22 @@ pub fn run_native(
 ///
 /// Call from `fn main` like this:
 /// ``` no_run
-/// use eframe::{egui, UserEvent};
+/// use eframe::egui;
 /// use winit::event_loop::{ControlFlow, EventLoop};
 ///
 /// fn main() -> eframe::Result {
 ///     let native_options = eframe::NativeOptions::default();
-///     let eventloop = EventLoop::<UserEvent>::with_user_event().build()?;
+///     let eventloop = EventLoop::builder().build()?;
 ///     eventloop.set_control_flow(ControlFlow::Poll);
 ///
-///     let mut winit_app = eframe::create_native(
+///     let winit_app = eframe::create_native(
 ///         "MyExtApp",
 ///         native_options,
 ///         Box::new(|cc| Ok(Box::new(MyEguiApp::new(cc)))),
 ///         &eventloop,
 ///     );
 ///
-///     eventloop.run_app(&mut winit_app)?;
+///     eventloop.run_app(winit_app)?;
 ///
 ///     Ok(())
 /// }
@@ -326,7 +326,7 @@ pub fn create_native<'a>(
     app_name: &str,
     mut native_options: NativeOptions,
     app_creator: AppCreator<'a>,
-    event_loop: &winit::event_loop::EventLoop<UserEvent>,
+    event_loop: &winit::event_loop::EventLoop,
 ) -> EframeWinitApplication<'a> {
     let renderer = init_native(app_name, &mut native_options);
 
@@ -514,7 +514,7 @@ pub enum Error {
 
     /// An error from [`winit`].
     #[cfg(not(target_arch = "wasm32"))]
-    Winit(winit::error::OsError),
+    Winit(winit::error::CreateWindowError),
 
     /// An error from [`winit::event_loop::EventLoop`].
     #[cfg(not(target_arch = "wasm32"))]
@@ -540,9 +540,9 @@ pub enum Error {
 impl std::error::Error for Error {}
 
 #[cfg(not(target_arch = "wasm32"))]
-impl From<winit::error::OsError> for Error {
+impl From<winit::error::CreateWindowError> for Error {
     #[inline]
-    fn from(err: winit::error::OsError) -> Self {
+    fn from(err: winit::error::CreateWindowError) -> Self {
         Self::Winit(err)
     }
 }

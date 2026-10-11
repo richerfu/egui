@@ -69,7 +69,7 @@ impl FullOutput {
 /// Information about text being edited.
 ///
 /// Useful for IME.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct IMEOutput {
     /// Where the [`crate::TextEdit`] is located on screen.
@@ -79,6 +79,25 @@ pub struct IMEOutput {
     ///
     /// This is a very thin rectangle.
     pub cursor_rect: crate::Rect,
+
+    /// Committed editor text and selection, for native IME queries.
+    /// Password fields never expose their contents here.
+    pub surrounding_text: Option<IMETextState>,
+
+    /// Use the system's secure input keyboard without exposing editor contents.
+    pub password: bool,
+
+    /// Whether the editor accepts newlines.
+    pub multiline: bool,
+}
+
+/// A native IME snapshot using UTF-16 document offsets.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
+pub struct IMETextState {
+    pub text: String,
+    pub selection: std::ops::Range<usize>,
+    pub reversed: bool,
 }
 
 /// Commands that the egui integration should execute at the end of a frame.
@@ -183,7 +202,7 @@ impl PlatformOutput {
         self.cursor_icon = cursor_icon;
         self.events.append(&mut events);
         self.mutable_text_under_cursor = mutable_text_under_cursor;
-        self.ime = ime.or(self.ime);
+        self.ime = ime.or_else(|| self.ime.take());
         self.num_completed_passes += num_completed_passes;
         self.request_discard_reasons
             .append(&mut request_discard_reasons);

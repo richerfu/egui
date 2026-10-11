@@ -15,7 +15,7 @@ pub fn create_egui_context(storage: Option<&dyn crate::Storage>) -> egui::Contex
 
     pub const IS_DESKTOP: bool = cfg!(any(
         target_os = "freebsd",
-        target_os = "linux",
+        all(target_os = "linux", not(target_env = "ohos")),
         target_os = "macos",
         target_os = "openbsd",
         target_os = "windows",
@@ -23,7 +23,7 @@ pub fn create_egui_context(storage: Option<&dyn crate::Storage>) -> egui::Contex
 
     let egui_ctx = egui::Context::default();
 
-    egui_ctx.set_embed_viewports(!IS_DESKTOP);
+    egui_ctx.set_embed_viewports(!(IS_DESKTOP || cfg!(target_env = "ohos")));
 
     egui_ctx.options_mut(|o| {
         // eframe supports multi-pass (Context::request_discard).
@@ -66,10 +66,43 @@ impl From<accesskit_winit::Event> for UserEvent {
     }
 }
 
+/// Typed event channel paired with winit's coalescing wake-up proxy.
+#[derive(Clone)]
+pub struct UserEventProxy {
+    sender: std::sync::mpsc::Sender<UserEvent>,
+    proxy: winit::event_loop::EventLoopProxy,
+}
+
+impl UserEventProxy {
+    pub fn new(
+        event_loop: &winit::event_loop::EventLoop,
+    ) -> (Self, std::sync::mpsc::Receiver<UserEvent>) {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        (
+            Self {
+                sender,
+                proxy: event_loop.create_proxy(),
+            },
+            receiver,
+        )
+    }
+
+    pub fn send_event(
+        &self,
+        event: UserEvent,
+    ) -> Result<(), std::sync::mpsc::SendError<UserEvent>> {
+        self.sender.send(event)?;
+        self.proxy.wake_up();
+        Ok(())
+    }
+}
+
 pub trait WinitApp {
+    fn take_event_receiver(&mut self) -> std::sync::mpsc::Receiver<UserEvent>;
+
     fn egui_ctx(&self) -> Option<&egui::Context>;
 
-    fn window(&self, window_id: WindowId) -> Option<Arc<Window>>;
+    fn window(&self, window_id: WindowId) -> Option<Arc<dyn Window>>;
 
     fn window_id_from_viewport_id(&self, id: ViewportId) -> Option<WindowId>;
 
@@ -79,24 +112,24 @@ pub trait WinitApp {
 
     fn run_ui_and_paint(
         &mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         window_id: WindowId,
     ) -> crate::Result<EventResult>;
 
-    fn suspended(&mut self, event_loop: &ActiveEventLoop) -> crate::Result<EventResult>;
+    fn suspended(&mut self, event_loop: &dyn ActiveEventLoop) -> crate::Result<EventResult>;
 
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) -> crate::Result<EventResult>;
+    fn resumed(&mut self, event_loop: &dyn ActiveEventLoop) -> crate::Result<EventResult>;
 
     fn device_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        device_id: winit::event::DeviceId,
+        event_loop: &dyn ActiveEventLoop,
+        device_id: Option<winit::event::DeviceId>,
         event: winit::event::DeviceEvent,
     ) -> crate::Result<EventResult>;
 
     fn window_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
+        event_loop: &dyn ActiveEventLoop,
         window_id: WindowId,
         event: winit::event::WindowEvent,
     ) -> crate::Result<EventResult>;
@@ -179,5 +212,63 @@ pub(crate) fn on_accesskit_window_event(
             // so there's no need to repaint.
             EventResult::Wait
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    #[derive(Debug, Default)]
+    struct CoalescingWake(AtomicBool);
+
+    impl winit::event_loop::EventLoopProxyProvider for CoalescingWake {
+        fn wake_up(&self) {
+            self.0.store(true, Ordering::Release);
+        }
+    }
+
+    #[test]
+    fn coalesced_wake_preserves_all_cross_thread_repaint_requests() {
+        let wake = Arc::new(CoalescingWake::default());
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let proxy = UserEventProxy {
+            sender,
+            proxy: winit::event_loop::EventLoopProxy::new(
+                Arc::clone(&wake) as Arc<dyn winit::event_loop::EventLoopProxyProvider>
+            ),
+        };
+        std::thread::scope(|scope| {
+            for _ in 0..4 {
+                let proxy = proxy.clone();
+                scope.spawn(move || {
+                    for pass in 0..25 {
+                        assert!(
+                            proxy
+                                .send_event(UserEvent::RequestRepaint {
+                                    viewport_id: ViewportId::ROOT,
+                                    when: Instant::now(),
+                                    cumulative_pass_nr: pass,
+                                })
+                                .is_ok()
+                        );
+                    }
+                });
+            }
+        });
+        assert!(wake.0.swap(false, Ordering::AcqRel));
+        assert_eq!(receiver.try_iter().count(), 100);
+        drop(receiver);
+        assert!(
+            proxy
+                .send_event(UserEvent::RequestRepaint {
+                    viewport_id: ViewportId::ROOT,
+                    when: Instant::now(),
+                    cumulative_pass_nr: 0,
+                })
+                .is_err()
+        );
+        assert!(!wake.0.load(Ordering::Acquire));
     }
 }

@@ -1,3 +1,6 @@
+#[cfg(all(target_env = "ohos", feature = "clipboard"))]
+mod ohos;
+
 use raw_window_handle::RawDisplayHandle;
 
 /// Handles interfacing with the OS clipboard.
@@ -5,8 +8,10 @@ use raw_window_handle::RawDisplayHandle;
 /// If the "clipboard" feature is off, or we cannot connect to the OS clipboard,
 /// then a fallback clipboard that just works within the same app is used instead.
 pub struct Clipboard {
+    #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+    ohos: Option<ohos::Clipboard>,
     #[cfg(all(
-        not(any(target_os = "android", target_os = "ios")),
+        not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
         feature = "arboard",
     ))]
     arboard: Option<arboard::Clipboard>,
@@ -19,6 +24,7 @@ pub struct Clipboard {
             target_os = "netbsd",
             target_os = "openbsd"
         ),
+        not(target_env = "ohos"),
         feature = "smithay-clipboard"
     ))]
     smithay: Option<smithay_clipboard::Clipboard>,
@@ -31,8 +37,10 @@ impl Clipboard {
     /// Construct a new instance
     pub fn new(_raw_display_handle: Option<RawDisplayHandle>) -> Self {
         Self {
+            #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+            ohos: None,
             #[cfg(all(
-                not(any(target_os = "android", target_os = "ios")),
+                not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
                 feature = "arboard",
             ))]
             arboard: init_arboard(),
@@ -45,6 +53,7 @@ impl Clipboard {
                     target_os = "netbsd",
                     target_os = "openbsd"
                 ),
+                not(target_env = "ohos"),
                 feature = "smithay-clipboard"
             ))]
             smithay: init_smithay_clipboard(_raw_display_handle),
@@ -53,7 +62,45 @@ impl Clipboard {
         }
     }
 
+    #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+    pub(crate) fn init_ohos(&mut self, app: &winit::platform::ohos::ability::OpenHarmonyApp) {
+        self.ohos
+            .get_or_insert_with(|| ohos::Clipboard::new(app.clone()));
+    }
+
+    pub(crate) fn request_paste(&mut self, ctx: &egui::Context, input: &mut egui::RawInput) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.request_paste(ctx);
+            return;
+        }
+        let _ = ctx;
+        if let Some(text) = self.get().filter(|text| !text.is_empty()) {
+            input
+                .events
+                .push(egui::Event::Paste(text.replace("\r\n", "\n")));
+        }
+    }
+
+    #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+    pub(crate) fn drain_pastes(&self, ctx: &egui::Context, input: &mut egui::RawInput) {
+        if let Some(clipboard) = &self.ohos {
+            clipboard.drain_pastes(ctx, input);
+        }
+    }
+
+    #[cfg_attr(
+        target_env = "ohos",
+        expect(
+            clippy::needless_pass_by_ref_mut,
+            reason = "other platform clipboard implementations require mutable access"
+        )
+    )]
     pub fn get(&mut self) -> Option<String> {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            return clipboard.get();
+        }
         #[cfg(all(
             any(
                 target_os = "linux",
@@ -62,6 +109,7 @@ impl Clipboard {
                 target_os = "netbsd",
                 target_os = "openbsd"
             ),
+            not(target_env = "ohos"),
             feature = "smithay-clipboard"
         ))]
         if let Some(clipboard) = &mut self.smithay {
@@ -75,7 +123,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -92,6 +140,11 @@ impl Clipboard {
     }
 
     pub fn set_text(&mut self, text: String) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.set_text(text);
+            return;
+        }
         #[cfg(all(
             any(
                 target_os = "linux",
@@ -100,6 +153,7 @@ impl Clipboard {
                 target_os = "netbsd",
                 target_os = "openbsd"
             ),
+            not(target_env = "ohos"),
             feature = "smithay-clipboard"
         ))]
         if let Some(clipboard) = &mut self.smithay {
@@ -108,7 +162,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -121,9 +175,21 @@ impl Clipboard {
         self.clipboard = text;
     }
 
+    #[cfg_attr(
+        target_env = "ohos",
+        expect(
+            clippy::needless_pass_by_ref_mut,
+            reason = "other platform clipboard implementations require mutable access"
+        )
+    )]
     pub fn set_image(&mut self, image: &egui::ColorImage) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.set_image(image);
+            return;
+        }
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -146,7 +212,7 @@ impl Clipboard {
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 fn init_arboard() -> Option<arboard::Clipboard> {
@@ -170,6 +236,7 @@ fn init_arboard() -> Option<arboard::Clipboard> {
         target_os = "netbsd",
         target_os = "openbsd"
     ),
+    not(target_env = "ohos"),
     feature = "smithay-clipboard"
 ))]
 fn init_smithay_clipboard(

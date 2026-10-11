@@ -161,7 +161,8 @@ def main():
         root_dirpath = os.path.abspath(f"{script_dirpath}/..")
         os.chdir(root_dirpath)
 
-        exclude = set(["target", "target_ra", "target_wasm"])
+        # Vendored dependencies retain their upstream style; see vendor/README.md.
+        exclude = set(["target", "target_ra", "target_wasm", "vendor"])
         for root, dirs, files in os.walk(".", topdown=True):
             dirs[:] = [d for d in dirs if d not in exclude]
             for filename in files:

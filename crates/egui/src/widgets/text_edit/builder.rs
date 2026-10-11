@@ -800,6 +800,30 @@ impl TextEdit<'_> {
                         o.ime = Some(crate::output::IMEOutput {
                             rect: to_global * rect,
                             cursor_rect: to_global * primary_cursor_rect,
+                            password,
+                            multiline,
+                            surrounding_text: if password {
+                                Some(crate::output::IMETextState {
+                                    text: String::new(),
+                                    selection: 0..0,
+                                    reversed: false,
+                                })
+                            } else if state.ime_enabled {
+                                None
+                            } else {
+                                state.cursor.char_range().map(|range| {
+                                    let utf16_offset = |index| {
+                                        text.as_str().chars().take(index).map(char::len_utf16).sum()
+                                    };
+                                    let primary: usize = utf16_offset(range.primary.index);
+                                    let secondary = utf16_offset(range.secondary.index);
+                                    crate::output::IMETextState {
+                                        text: text.as_str().to_owned(),
+                                        selection: primary.min(secondary)..primary.max(secondary),
+                                        reversed: primary < secondary,
+                                    }
+                                })
+                            },
                         });
                     });
                 }
@@ -1089,6 +1113,45 @@ fn events(
                 }
 
                 match ime_event {
+                    ImeEvent::Selection { start, end } => {
+                        state.ime_enabled = false;
+                        let index = |offset| {
+                            let mut units = 0;
+                            text.as_str()
+                                .chars()
+                                .take_while(|ch| {
+                                    units += ch.len_utf16();
+                                    units <= offset
+                                })
+                                .count()
+                        };
+                        Some(CCursorRange::two(
+                            CCursor::new(index(*start)),
+                            CCursor::new(index(*end)),
+                        ))
+                    }
+                    ImeEvent::DeleteSurrounding { before, after } => {
+                        state.ime_enabled = false;
+                        let range = cursor_range.as_sorted_char_range();
+                        let chars: Vec<_> = text.as_str().chars().collect();
+                        let mut start = range.start.min(chars.len());
+                        let mut end = range.end.min(chars.len());
+                        // A selected range is replaced as a unit, matching native editors.
+                        if start == end {
+                            let mut units = 0;
+                            while start > 0 && units < *before {
+                                start -= 1;
+                                units += chars[start].len_utf16();
+                            }
+                            units = 0;
+                            while end < chars.len() && units < *after {
+                                units += chars[end].len_utf16();
+                                end += 1;
+                            }
+                        }
+                        text.delete_char_range(start..end);
+                        Some(CCursorRange::one(CCursor::new(start)))
+                    }
                     ImeEvent::Enabled => {
                         state.ime_enabled = true;
                         state.ime_cursor_range = cursor_range;

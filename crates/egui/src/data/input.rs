@@ -476,6 +476,25 @@ pub enum Event {
     /// On touch-up first send `PointerButton{pressed: false, …}` followed by `PointerLeft`.
     PointerGone,
 
+    /// Native pen metadata accompanying the ordinary pointer events.
+    /// Missing axes remain unknown; touch input is kept separate from pen input.
+    Pen {
+        /// Contact lifecycle, including cancellation on focus loss.
+        phase: TouchPhase,
+
+        /// Normalized tip pressure in 0..=1 when the device reports it.
+        pressure: Option<f32>,
+
+        /// Tilt around the screen X and Y axes in degrees, each in -90..=90.
+        tilt: Option<Vec2>,
+
+        /// Clockwise barrel rotation in degrees, in 0..360.
+        twist: Option<f32>,
+
+        /// Whether the eraser end is active.
+        eraser: bool,
+    },
+
     /// Zoom scale factor this frame (e.g. from a pinch gesture).
     ///
     /// * `zoom = 1`: no change.
@@ -575,6 +594,13 @@ pub enum ImeEvent {
 
     /// IME composition ended with this final result.
     Commit(String),
+
+    /// Set the editor selection using UTF-16 document offsets.
+    Selection { start: usize, end: usize },
+
+    /// Delete UTF-16 units before/after the current selection. Whole Unicode
+    /// characters are removed if a count intersects a surrogate pair.
+    DeleteSurrounding { before: usize, after: usize },
 
     /// Notifies when the IME was disabled.
     Disabled,

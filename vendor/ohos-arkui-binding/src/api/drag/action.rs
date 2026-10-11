@@ -1,0 +1,256 @@
+//! Module api::drag::action wrappers and related types.
+
+use std::{os::raw::c_void, ptr::NonNull, rc::Rc};
+
+use ohos_arkui_input_binding::ArkUIErrorCode;
+#[cfg(feature = "napi")]
+use ohos_arkui_sys::OH_ArkUI_CreateDragActionWithContext;
+#[cfg(feature = "udmf")]
+use ohos_arkui_sys::OH_ArkUI_DragAction_SetData;
+#[cfg(feature = "image")]
+use ohos_arkui_sys::OH_ArkUI_DragAction_SetPixelMaps;
+use ohos_arkui_sys::{
+    ArkUI_DragAction, ArkUI_DragAndDropInfo, OH_ArkUI_CreateDragActionWithNode,
+    OH_ArkUI_DragAction_Dispose, OH_ArkUI_DragAction_RegisterStatusListener,
+    OH_ArkUI_DragAction_SetDragPreviewOption, OH_ArkUI_DragAction_SetPointerId,
+    OH_ArkUI_DragAction_SetTouchPointX, OH_ArkUI_DragAction_SetTouchPointY,
+    OH_ArkUI_DragAction_UnregisterStatusListener, OH_ArkUI_StartDrag,
+};
+#[cfg(feature = "image")]
+use ohos_image_native_binding::PixelMap;
+#[cfg(feature = "udmf")]
+use ohos_udmf_binding::UdmfData;
+
+#[cfg(all(feature = "api-20", feature = "udmf"))]
+use ohos_udmf_binding::UdmfDataLoadParams;
+
+use crate::{check_arkui_status, ArkUIError, ArkUIHandle, ArkUIResult};
+
+use super::{DragAndDropInfo, DragPreviewOption};
+
+/// Owned snapshot of native drag completion. No callback-scoped handle escapes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct DragCompletion {
+    pub status: crate::DragStatus,
+    pub result: Option<crate::DragResult>,
+    pub operation: Option<crate::DropOperation>,
+}
+
+struct DragStatusListenerCallbackContext {
+    callback: Box<dyn Fn(DragCompletion)>,
+}
+
+/// Owns an outbound drag action and unregisters its listener before destruction.
+/// Keep the source node alive until the action is dropped; use only on its UI thread.
+pub struct DragAction {
+    raw: NonNull<ArkUI_DragAction>,
+    status_listener: Option<Rc<DragStatusListenerCallbackContext>>,
+    #[cfg(feature = "image")]
+    pixel_maps: Vec<PixelMap>,
+    #[cfg(feature = "udmf")]
+    data: Option<UdmfData>,
+}
+
+impl DragAction {
+    pub fn new_with_node(node: &crate::ArkUINode) -> ArkUIResult<Self> {
+        let action = unsafe { OH_ArkUI_CreateDragActionWithNode(node.raw()) };
+        let action = NonNull::new(action).ok_or_else(|| {
+            ArkUIError::new(
+                ArkUIErrorCode::ParamInvalid,
+                "OH_ArkUI_CreateDragActionWithNode returned null",
+            )
+        })?;
+        Ok(Self::from_non_null(action))
+    }
+
+    #[cfg(feature = "napi")]
+    pub(crate) fn new_with_context(ui_context: crate::ArkUIContext) -> ArkUIResult<Self> {
+        let action = unsafe { OH_ArkUI_CreateDragActionWithContext(ui_context.raw()) };
+        let action = NonNull::new(action).ok_or_else(|| {
+            ArkUIError::new(
+                ArkUIErrorCode::ParamInvalid,
+                "OH_ArkUI_CreateDragActionWithContext returned null",
+            )
+        })?;
+        Ok(Self::from_non_null(action))
+    }
+
+    pub(crate) fn raw(&self) -> *mut ArkUI_DragAction {
+        self.raw.as_ptr()
+    }
+
+    pub(crate) fn from_raw(raw: *mut ArkUI_DragAction) -> ArkUIResult<Self> {
+        let raw = NonNull::new(raw).ok_or_else(|| {
+            ArkUIError::new(ArkUIErrorCode::ParamInvalid, "ArkUI_DragAction is null")
+        })?;
+        Ok(Self::from_non_null(raw))
+    }
+
+    pub(crate) fn from_non_null(raw: NonNull<ArkUI_DragAction>) -> Self {
+        Self {
+            raw,
+            status_listener: None,
+            #[cfg(feature = "image")]
+            pixel_maps: Vec::new(),
+            #[cfg(feature = "udmf")]
+            data: None,
+        }
+    }
+
+    pub fn set_pointer_id(&mut self, pointer: i32) -> ArkUIResult<()> {
+        unsafe { check_arkui_status!(OH_ArkUI_DragAction_SetPointerId(self.raw(), pointer)) }
+    }
+
+    #[cfg(feature = "image")]
+    pub fn set_pixel_maps(&mut self, pixelmap_array: Vec<PixelMap>) -> ArkUIResult<()> {
+        let mut raw_pixelmap_array: Vec<*mut _> = pixelmap_array
+            .iter()
+            .map(|pixel_map| pixel_map.as_raw().cast())
+            .collect();
+        unsafe {
+            check_arkui_status!(OH_ArkUI_DragAction_SetPixelMaps(
+                self.raw(),
+                raw_pixelmap_array.as_mut_ptr(),
+                raw_pixelmap_array.len() as i32
+            ))
+        }?;
+        self.pixel_maps = pixelmap_array;
+        Ok(())
+    }
+
+    pub fn set_touch_point_x(&mut self, x: f32) -> ArkUIResult<()> {
+        unsafe { check_arkui_status!(OH_ArkUI_DragAction_SetTouchPointX(self.raw(), x)) }
+    }
+
+    pub fn set_touch_point_y(&mut self, y: f32) -> ArkUIResult<()> {
+        unsafe { check_arkui_status!(OH_ArkUI_DragAction_SetTouchPointY(self.raw(), y)) }
+    }
+
+    #[cfg(feature = "udmf")]
+    pub fn set_data(&mut self, data: UdmfData) -> ArkUIResult<()> {
+        unsafe {
+            check_arkui_status!(OH_ArkUI_DragAction_SetData(self.raw(), data.raw().as_ptr()))
+        }?;
+        self.data = Some(data);
+        Ok(())
+    }
+
+    #[cfg(all(feature = "api-20", feature = "udmf"))]
+    pub(crate) fn set_data_load_params(
+        &mut self,
+        data_load_params: &UdmfDataLoadParams,
+    ) -> ArkUIResult<()> {
+        unsafe {
+            check_arkui_status!(ohos_arkui_sys::OH_ArkUI_DragAction_SetDataLoadParams(
+                self.raw(),
+                data_load_params.as_raw()
+            ))
+        }
+    }
+
+    pub(crate) fn set_drag_preview_option(
+        &mut self,
+        option: &DragPreviewOption,
+    ) -> ArkUIResult<()> {
+        unsafe {
+            check_arkui_status!(OH_ArkUI_DragAction_SetDragPreviewOption(
+                self.raw(),
+                option.raw()
+            ))
+        }
+    }
+
+    pub fn register_status_listener<T: Fn(crate::DragStatus) + 'static>(
+        &mut self,
+        listener: T,
+    ) -> ArkUIResult<()> {
+        self.register_completion_listener(move |completion| listener(completion.status))
+    }
+
+    /// The status and drop result are copied while the native callback is valid.
+    pub fn register_completion_listener<T: Fn(DragCompletion) + 'static>(
+        &mut self,
+        listener: T,
+    ) -> ArkUIResult<()> {
+        self.unregister_status_listener();
+        let listener = Rc::new(DragStatusListenerCallbackContext {
+            callback: Box::new(listener),
+        });
+
+        let result = unsafe {
+            check_arkui_status!(OH_ArkUI_DragAction_RegisterStatusListener(
+                self.raw(),
+                Rc::as_ptr(&listener).cast_mut().cast(),
+                Some(drag_action_status_listener_callback_trampoline)
+            ))
+        };
+
+        result?;
+
+        self.status_listener = Some(listener);
+        Ok(())
+    }
+
+    pub fn unregister_status_listener(&mut self) {
+        unsafe { OH_ArkUI_DragAction_UnregisterStatusListener(self.raw()) }
+        self.status_listener.take();
+    }
+
+    pub fn start_drag(&self) -> ArkUIResult<()> {
+        unsafe { check_arkui_status!(OH_ArkUI_StartDrag(self.raw())) }
+    }
+}
+
+impl Drop for DragAction {
+    fn drop(&mut self) {
+        self.unregister_status_listener();
+        unsafe { OH_ArkUI_DragAction_Dispose(self.raw()) };
+        // The retained data and preview are released after native disposal.
+    }
+}
+
+impl ArkUIHandle {
+    pub(crate) fn create_drag_action_with_node(
+        &self,
+        node: &crate::ArkUINode,
+    ) -> ArkUIResult<DragAction> {
+        let _ = self.raw();
+        DragAction::new_with_node(node)
+    }
+
+    #[cfg(feature = "napi")]
+    pub(crate) fn create_drag_action_with_context(
+        &self,
+        ui_context: crate::ArkUIContext,
+    ) -> ArkUIResult<DragAction> {
+        let _ = self.raw();
+        DragAction::new_with_context(ui_context)
+    }
+}
+
+unsafe extern "C" fn drag_action_status_listener_callback_trampoline(
+    drag_and_drop_info: *mut ArkUI_DragAndDropInfo,
+    user_data: *mut c_void,
+) {
+    let Some(callback) = NonNull::new(user_data.cast::<DragStatusListenerCallbackContext>()) else {
+        return;
+    };
+    let Some(drag_info) = (unsafe { DragAndDropInfo::from_raw(drag_and_drop_info) }) else {
+        return;
+    };
+    // A listener may release its action while handling completion. Keep its
+    // closure alive through the current invocation after native unregistration.
+    unsafe { Rc::increment_strong_count(callback.as_ptr()) };
+    let callback = unsafe { Rc::from_raw(callback.as_ptr()) };
+    let status = drag_info.drag_status();
+    let event = drag_info.drag_event();
+    let completion = DragCompletion {
+        status,
+        result: event.as_ref().and_then(|event| event.drag_result().ok()),
+        operation: event.as_ref().and_then(|event| event.drop_operation().ok()),
+    };
+    // Rust panics must never unwind through a native C callback.
+    let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        (callback.callback)(completion)
+    }));
+}

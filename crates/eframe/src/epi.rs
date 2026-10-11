@@ -31,7 +31,7 @@ pub use winit::{event_loop::EventLoopBuilder, window::WindowAttributes};
 /// done by `EFrame`.
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
-pub type EventLoopBuilderHook = Box<dyn FnOnce(&mut EventLoopBuilder<UserEvent>)>;
+pub type EventLoopBuilderHook = Box<dyn FnOnce(&mut EventLoopBuilder)>;
 
 /// Hook into the building of a the native window.
 ///
@@ -358,8 +358,8 @@ pub struct NativeOptions {
     ///
     /// This feature was introduced in <https://github.com/emilk/egui/pull/1889>.
     ///
-    /// When `true`, [`winit::platform::run_on_demand::EventLoopExtRunOnDemand`] is used.
-    /// When `false`, [`winit::event_loop::EventLoop::run`] is used.
+    /// When `true`, [`winit::event_loop::run_on_demand::EventLoopExtRunOnDemand`] is used.
+    /// When `false`, [`winit::event_loop::EventLoop::run_app`] is used.
     pub run_and_return: bool,
 
     /// Hook into the building of an event loop before it is run.
@@ -425,13 +425,13 @@ pub struct NativeOptions {
     #[cfg(target_os = "android")]
     pub android_app: Option<winit::platform::android::activity::AndroidApp>,
 
-    /// OpenHarmony application for `winit`'s event loop.
+    /// `OpenHarmony` application for `winit`'s event loop.
     ///
-    /// This value is required on OpenHarmony to correctly create the event loop. See
+    /// This value is required on `OpenHarmony` to correctly create the event loop. See
     /// [`EventLoopBuilder::build`] and [`with_openharmony_app`] for details.
     ///
     /// [`EventLoopBuilder::build`]: winit::event_loop::EventLoopBuilder::build
-    /// [`with_openharmony_app`]: winit::platform::android::EventLoopBuilderExtOhos::with_openharmony_app
+    /// [`with_openharmony_app`]: winit::platform::ohos::EventLoopBuilderExtOpenHarmony::with_openharmony_app
     #[cfg(target_env = "ohos")]
     pub openharmony_app: Option<winit::platform::ohos::ability::OpenHarmonyApp>,
 }

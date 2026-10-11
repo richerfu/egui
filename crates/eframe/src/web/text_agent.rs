@@ -10,7 +10,7 @@ use super::{AppRunner, WebRunner};
 
 pub struct TextAgent {
     input: web_sys::HtmlInputElement,
-    prev_ime_output: Cell<Option<egui::output::IMEOutput>>,
+    prev_ime_cursor_rect: Cell<Option<egui::Rect>>,
 }
 
 impl TextAgent {
@@ -118,7 +118,7 @@ impl TextAgent {
 
         Ok(Self {
             input,
-            prev_ime_output: Default::default(),
+            prev_ime_cursor_rect: Default::default(),
         })
     }
 
@@ -129,10 +129,10 @@ impl TextAgent {
         zoom_factor: f32,
     ) -> Result<(), JsValue> {
         // Don't move the text agent unless the position actually changed:
-        if self.prev_ime_output.get() == ime {
+        let cursor_rect = ime.as_ref().map(|ime| ime.cursor_rect);
+        if self.prev_ime_cursor_rect.replace(cursor_rect) == cursor_rect {
             return Ok(());
         }
-        self.prev_ime_output.set(ime);
 
         let Some(ime) = ime else { return Ok(()) };
 

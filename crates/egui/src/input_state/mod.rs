@@ -1201,6 +1201,28 @@ impl PointerState {
 
                     self.down[button as usize] = pressed; // must be done after the above call to `could_any_button_be_click`
                 }
+                Event::Pen {
+                    phase: crate::TouchPhase::Cancel,
+                    ..
+                } => {
+                    for button in [
+                        crate::PointerButton::Primary,
+                        crate::PointerButton::Secondary,
+                        crate::PointerButton::Middle,
+                        crate::PointerButton::Extra1,
+                        crate::PointerButton::Extra2,
+                    ] {
+                        if self.down[button as usize] {
+                            self.pointer_events.push(PointerEvent::Released {
+                                click: None,
+                                button,
+                            });
+                        }
+                    }
+                    self.down.fill(false);
+                    self.press_origin = None;
+                    self.press_start_time = None;
+                }
                 Event::PointerGone => {
                     self.latest_pos = None;
                     // When dragging a slider and the mouse leaves the viewport, we still want the drag to work,

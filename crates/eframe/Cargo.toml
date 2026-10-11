@@ -139,7 +139,7 @@ serde = { workspace = true, optional = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 egui-winit = { workspace = true, default-features = false, features = ["clipboard", "links"] }
 image = { workspace = true, features = ["png"] } # Needed for app icon
-winit = { workspace = true, default-features = false, features = ["rwh_06"] }
+winit = { workspace = true, default-features = false }
 
 # optional native:
 egui-wgpu = { workspace = true, optional = true, features = [
@@ -169,6 +169,9 @@ objc2-app-kit = { workspace = true, default-features = false, features = [
   "std",
   "NSApplication",
   "NSImage",
+  "NSBitmapImageRep",
+  "NSGraphics",
+  "NSImageRep",
   "NSMenu",
   "NSMenuItem",
   "NSResponder",

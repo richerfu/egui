@@ -13,7 +13,7 @@ use winit::raw_window_handle::HasWindowHandle as _;
 
 /// The majority of `GlutinWindowContext` is taken from `eframe`
 struct GlutinWindowContext {
-    window: winit::window::Window,
+    window: Box<dyn winit::window::Window>,
     gl_context: glutin::context::PossiblyCurrentContext,
     gl_display: glutin::display::Display,
     gl_surface: glutin::surface::Surface<glutin::surface::WindowSurface>,
@@ -23,14 +23,14 @@ impl GlutinWindowContext {
     // refactor this function to use `glutin-winit` crate eventually.
     // preferably add android support at the same time.
     #[expect(unsafe_code)]
-    unsafe fn new(event_loop: &winit::event_loop::ActiveEventLoop) -> Self {
+    unsafe fn new(event_loop: &dyn winit::event_loop::ActiveEventLoop) -> Self {
         use glutin::context::NotCurrentGlContext as _;
         use glutin::display::GetGlDisplay as _;
         use glutin::display::GlDisplay as _;
         use glutin::prelude::GlSurface as _;
         let winit_window_builder = winit::window::WindowAttributes::default()
             .with_resizable(true)
-            .with_inner_size(winit::dpi::LogicalSize {
+            .with_surface_size(winit::dpi::LogicalSize {
                 width: 800.0,
                 height: 600.0,
             })
@@ -93,7 +93,7 @@ impl GlutinWindowContext {
             glutin_winit::finalize_window(event_loop, winit_window_builder.clone(), &gl_config)
                 .expect("failed to finalize glutin window")
         });
-        let (width, height): (u32, u32) = window.inner_size().into();
+        let (width, height): (u32, u32) = window.surface_size().into();
         let width = NonZeroU32::new(width).unwrap_or(NonZeroU32::MIN);
         let height = NonZeroU32::new(height).unwrap_or(NonZeroU32::MIN);
         let surface_attributes =
@@ -133,8 +133,8 @@ impl GlutinWindowContext {
         }
     }
 
-    fn window(&self) -> &winit::window::Window {
-        &self.window
+    fn window(&self) -> &dyn winit::window::Window {
+        self.window.as_ref()
     }
 
     fn resize(&self, physical_size: winit::dpi::PhysicalSize<u32>) {
@@ -163,7 +163,9 @@ pub enum UserEvent {
 }
 
 struct GlowApp {
-    proxy: winit::event_loop::EventLoopProxy<UserEvent>,
+    proxy: winit::event_loop::EventLoopProxy,
+    sender: std::sync::mpsc::Sender<UserEvent>,
+    receiver: std::sync::mpsc::Receiver<UserEvent>,
     gl_window: Option<GlutinWindowContext>,
     gl: Option<Arc<glow::Context>>,
     egui_glow: Option<egui_glow::EguiGlow>,
@@ -172,9 +174,12 @@ struct GlowApp {
 }
 
 impl GlowApp {
-    fn new(proxy: winit::event_loop::EventLoopProxy<UserEvent>) -> Self {
+    fn new(proxy: winit::event_loop::EventLoopProxy) -> Self {
+        let (sender, receiver) = std::sync::mpsc::channel();
         Self {
             proxy,
+            sender,
+            receiver,
             gl_window: None,
             gl: None,
             egui_glow: None,
@@ -184,22 +189,22 @@ impl GlowApp {
     }
 }
 
-impl winit::application::ApplicationHandler<UserEvent> for GlowApp {
-    fn resumed(&mut self, event_loop: &winit::event_loop::ActiveEventLoop) {
+impl winit::application::ApplicationHandler for GlowApp {
+    fn can_create_surfaces(&mut self, event_loop: &dyn winit::event_loop::ActiveEventLoop) {
         let (gl_window, gl) = create_display(event_loop);
         let gl = std::sync::Arc::new(gl);
         gl_window.window().set_visible(true);
 
         let egui_glow = egui_glow::EguiGlow::new(event_loop, Arc::clone(&gl), None, None, true);
 
-        let event_loop_proxy = egui::mutex::Mutex::new(self.proxy.clone());
+        let event_loop_proxy = self.proxy.clone();
+        let sender = self.sender.clone();
         egui_glow
             .egui_ctx
             .set_request_repaint_callback(move |info| {
-                event_loop_proxy
-                    .lock()
-                    .send_event(UserEvent::Redraw(info.delay))
-                    .expect("Cannot send event");
+                if sender.send(UserEvent::Redraw(info.delay)).is_ok() {
+                    event_loop_proxy.wake_up();
+                }
             });
         self.gl_window = Some(gl_window);
         self.gl = Some(gl);
@@ -208,7 +213,7 @@ impl winit::application::ApplicationHandler<UserEvent> for GlowApp {
 
     fn window_event(
         &mut self,
-        event_loop: &winit::event_loop::ActiveEventLoop,
+        event_loop: &dyn winit::event_loop::ActiveEventLoop,
         _window_id: winit::window::WindowId,
         event: winit::event::WindowEvent,
     ) {
@@ -281,54 +286,65 @@ impl winit::application::ApplicationHandler<UserEvent> for GlowApp {
             return;
         }
 
-        if let winit::event::WindowEvent::Resized(physical_size) = &event {
+        if let winit::event::WindowEvent::SurfaceResized(physical_size) = &event {
             self.gl_window.as_mut().unwrap().resize(*physical_size);
         }
 
-        let event_response = self
-            .egui_glow
-            .as_mut()
-            .unwrap()
-            .on_window_event(self.gl_window.as_mut().unwrap().window(), &event);
+        let event_response = self.egui_glow.as_mut().unwrap().on_window_event(
+            event_loop,
+            self.gl_window.as_mut().unwrap().window(),
+            &event,
+        );
 
         if event_response.repaint {
             self.gl_window.as_mut().unwrap().window().request_redraw();
         }
     }
 
-    fn user_event(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop, event: UserEvent) {
-        match event {
-            UserEvent::Redraw(delay) => self.repaint_delay = delay,
+    fn proxy_wake_up(&mut self, event_loop: &dyn winit::event_loop::ActiveEventLoop) {
+        let mut delay = std::time::Duration::MAX;
+        while let Ok(UserEvent::Redraw(requested)) = self.receiver.try_recv() {
+            delay = delay.min(requested);
+        }
+        self.repaint_delay = delay;
+        if delay.is_zero() {
+            if let Some(window) = &self.gl_window {
+                window.window().request_redraw();
+            }
+        } else if let Some(when) = std::time::Instant::now().checked_add(delay) {
+            event_loop.set_control_flow(winit::event_loop::ControlFlow::WaitUntil(when));
         }
     }
 
     fn new_events(
         &mut self,
-        _event_loop: &winit::event_loop::ActiveEventLoop,
+        _event_loop: &dyn winit::event_loop::ActiveEventLoop,
         cause: winit::event::StartCause,
     ) {
         if let winit::event::StartCause::ResumeTimeReached { .. } = &cause {
             self.gl_window.as_mut().unwrap().window().request_redraw();
         }
     }
+}
 
-    fn exiting(&mut self, _event_loop: &winit::event_loop::ActiveEventLoop) {
-        self.egui_glow.as_mut().unwrap().destroy();
+impl Drop for GlowApp {
+    fn drop(&mut self) {
+        if let Some(egui_glow) = &mut self.egui_glow {
+            egui_glow.destroy();
+        }
     }
 }
 
 fn main() {
-    let event_loop = winit::event_loop::EventLoop::<UserEvent>::with_user_event()
-        .build()
-        .unwrap();
+    let event_loop = winit::event_loop::EventLoop::builder().build().unwrap();
     let proxy = event_loop.create_proxy();
 
-    let mut app = GlowApp::new(proxy);
-    event_loop.run_app(&mut app).expect("failed to run app");
+    let app = GlowApp::new(proxy);
+    event_loop.run_app(app).expect("failed to run app");
 }
 
 fn create_display(
-    event_loop: &winit::event_loop::ActiveEventLoop,
+    event_loop: &dyn winit::event_loop::ActiveEventLoop,
 ) -> (GlutinWindowContext, glow::Context) {
     let glutin_window_context = unsafe { GlutinWindowContext::new(event_loop) };
     let gl = unsafe {

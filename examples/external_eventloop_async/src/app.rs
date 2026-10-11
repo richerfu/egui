@@ -5,7 +5,7 @@ use std::{cell::Cell, io, os::fd::AsRawFd as _, rc::Rc, time::Duration};
 use tokio::task::LocalSet;
 use winit::event_loop::{ControlFlow, EventLoop};
 
-use eframe::{EframePumpStatus, UserEvent, egui};
+use eframe::{EframePumpStatus, egui};
 
 pub fn run() -> io::Result<()> {
     env_logger::init(); // Log to stderr (if you run with `RUST_LOG=debug`).
@@ -14,7 +14,7 @@ pub fn run() -> io::Result<()> {
         ..Default::default()
     };
 
-    let mut eventloop = EventLoop::<UserEvent>::with_user_event().build().unwrap();
+    let mut eventloop = EventLoop::builder().build().unwrap();
     eventloop.set_control_flow(ControlFlow::Poll);
 
     let mut winit_app = eframe::create_native(

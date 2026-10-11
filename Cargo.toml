@@ -1,5 +1,6 @@
 [workspace]
 resolver = "2"
+exclude = ["vendor/ohos-xcomponent-binding", "vendor/openharmony-ability", "vendor/ohos-arkui-binding", "vendor/accesskit_winit", "vendor/glutin-winit", "vendor/winit-ohos", "vendor/accesskit_ohos"]
 members = [
   "crates/ecolor",
   "crates/egui_demo_app",
@@ -91,8 +92,8 @@ ehttp = { version = "0.6.0", default-features = false }
 enum-map = "2.7.3"
 env_logger = { version = "0.11.8", default-features = false }
 glow = "0.16.0"
-glutin = { git = "https://github.com/richerfu/glutin.git",branch = "master", default-features = false }
-glutin-winit = { git = "https://github.com/richerfu/glutin.git",branch = "master", default-features = false }
+glutin = { git = "https://github.com/rust-windowing/glutin.git", rev = "940a394cc205f152eb12076feff59f1eaaff4f7a", default-features = false }
+glutin-winit = { path = "vendor/glutin-winit", default-features = false }
 home = "0.5.9"
 image = { version = "0.25.6", default-features = false }
 js-sys = "0.3.77"
@@ -146,10 +147,10 @@ webbrowser = "1.0.5"
 wgpu = { version = "27.0.1", default-features = false, features = ["std"] }
 windows-sys = "0.61.2"
 
-winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-ohos-3x", default-features = false }
+winit = { git = "https://github.com/richerfu/winit.git", rev = "c9ee2bff8a79aacb8068546e7150197693d35a5a", default-features = false, features = ["ohos-window-plugin"] }
 
-openharmony-ability = { git = "https://github.com/harmony-contrib/openharmony-ability.git" }
-openharmony-ability-derive = { git = "https://github.com/harmony-contrib/openharmony-ability.git" }
+openharmony-ability = { path = "vendor/openharmony-ability/crates/ability" }
+openharmony-ability-derive = { path = "vendor/openharmony-ability/crates/derive" }
 
 
 [workspace.lints.rust]
@@ -373,3 +374,32 @@ self_named_module_files = "allow" # Disabled waiting on https://github.com/rust-
 significant_drop_tightening = "allow" # Too many false positives
 wildcard_imports = "allow" # `use crate::*` is useful to avoid merge conflicts when adding/removing imports
 
+
+# The facade and its standalone backend must share winit-core/dpi types.
+# Keep the native binding family together with the pinned ability runtime.
+# See vendor/README.md for upstream revisions and the local compatibility patches.
+[patch.crates-io]
+accesskit_winit = { path = "vendor/accesskit_winit" }
+winit = { git = "https://github.com/richerfu/winit.git", rev = "c9ee2bff8a79aacb8068546e7150197693d35a5a" }
+winit-core = { git = "https://github.com/richerfu/winit.git", rev = "c9ee2bff8a79aacb8068546e7150197693d35a5a" }
+dpi = { git = "https://github.com/richerfu/winit.git", rev = "c9ee2bff8a79aacb8068546e7150197693d35a5a" }
+winit-ohos = { path = "vendor/winit-ohos" }
+openharmony-ability = { path = "vendor/openharmony-ability/crates/ability" }
+openharmony-ability-derive = { path = "vendor/openharmony-ability/crates/derive" }
+openharmony-ability-plugin-window = { path = "vendor/openharmony-ability/crates/plugin-window" }
+openharmony-ability-plugin-clipboard = { path = "vendor/openharmony-ability/crates/plugin-clipboard" }
+openharmony-ability-plugin-url = { path = "vendor/openharmony-ability/crates/plugin-url" }
+openharmony-ability-plugin-files = { path = "vendor/openharmony-ability/crates/plugin-files" }
+openharmony-ability-plugin-app-control = { path = "vendor/openharmony-ability/crates/plugin-app-control" }
+
+openharmony-ability-plugin-permission = { path = "vendor/openharmony-ability/crates/plugin-permission" }
+
+openharmony-ability-plugin-menu = { path = "vendor/openharmony-ability/crates/plugin-menu" }
+openharmony-ability-plugin-notification = { path = "vendor/openharmony-ability/crates/plugin-notification" }
+openharmony-ability-plugin-process = { path = "vendor/openharmony-ability/crates/plugin-process" }
+openharmony-ability-plugin-system-state = { path = "vendor/openharmony-ability/crates/plugin-system-state" }
+openharmony-ability-plugin-accessibility = { path = "vendor/openharmony-ability/crates/plugin-accessibility" }
+
+ohos-arkui-binding = { path = "vendor/ohos-arkui-binding" }
+
+ohos-xcomponent-binding = { path = "vendor/ohos-xcomponent-binding" }

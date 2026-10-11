@@ -107,5 +107,10 @@ unknown-registry = "deny"
 unknown-git = "deny"
 
 allow-git = [
+  # Pinned native integrations; origins and local patches are documented in vendor/README.md.
+  "https://github.com/richerfu/winit.git",
+  "https://github.com/rust-windowing/glutin.git",
+  "https://github.com/richerfu/openharmony-ability.git",
+  "https://github.com/ohos-rs/ohos-native-bindings.git",
   "https://github.com/rerun-io/kittest", # TODO(lucasmerlin): remove this once the kittest crate is published"
 ]
