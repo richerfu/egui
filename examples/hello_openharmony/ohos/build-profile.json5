@@ -1,0 +1,88 @@
+{
+  "app": {
+    "products": [
+      {
+        "name": "default",
+        "compatibleSdkVersion": "6.0.2(22)",
+        "targetSdkVersion": "26.0.0",
+        "runtimeOS": "HarmonyOS",
+        "buildOption": {
+          "strictMode": {
+            "caseSensitiveCheck": true,
+            "useNormalizedOHMUrl": true
+          }
+        }
+      }
+    ],
+    "buildModeSet": [
+      {
+        "name": "debug"
+      },
+      {
+        "name": "release"
+      }
+    ]
+  },
+  "modules": [
+    {
+      "name": "entry",
+      "srcPath": "./entry",
+      "targets": [
+        {
+          "name": "default",
+          "applyToProducts": [
+            "default"
+          ]
+        }
+      ]
+    },
+    {
+      "name": "native_ability",
+      "srcPath": "./native_ability"
+    },
+    {
+      "name": "plugin_window",
+      "srcPath": "./plugins/window"
+    },
+    {
+      "name": "plugin_clipboard",
+      "srcPath": "./plugins/clipboard"
+    },
+    {
+      "name": "plugin_url",
+      "srcPath": "./plugins/url"
+    },
+    {
+      "name": "plugin_files",
+      "srcPath": "./plugins/files"
+    },
+    {
+      "name": "plugin_app_control",
+      "srcPath": "./plugins/app-control"
+    },
+    {
+      "name": "plugin_permission",
+      "srcPath": "./plugins/permission"
+    },
+    {
+      "name": "plugin_menu",
+      "srcPath": "./plugins/menu"
+    },
+    {
+      "name": "plugin_notification",
+      "srcPath": "./plugins/notification"
+    },
+    {
+      "name": "plugin_process",
+      "srcPath": "./plugins/process"
+    },
+    {
+      "name": "plugin_system_state",
+      "srcPath": "./plugins/system-state"
+    },
+    {
+      "name": "plugin_accessibility",
+      "srcPath": "./plugins/accessibility"
+    }
+  ]
+}
