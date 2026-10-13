@@ -4,8 +4,8 @@ use std::{
     collections::HashMap,
     ops::ControlFlow,
     sync::{
-        atomic::{AtomicI64, Ordering},
         Arc,
+        atomic::{AtomicI64, Ordering},
     },
 };
 use winit_core::{
@@ -215,7 +215,10 @@ pub fn file_uri(path: &std::path::Path) -> Option<String> {
 // Native drag actions and their callbacks belong to the Ability's UI thread.
 // Keep them outside Send/Sync window handles and release before surface destruction.
 thread_local! {
+    // OHOS uses emulated TLS; rustc 1.95 lints the macro-generated fallback.
+    #[allow(clippy::missing_const_for_thread_local)]
     static OUTGOING: std::cell::RefCell<Option<Outgoing>> = const { std::cell::RefCell::new(None) };
+    #[allow(clippy::missing_const_for_thread_local)]
     static POINTER: std::cell::Cell<(WindowId, i32)> = const { std::cell::Cell::new((WindowId::from_raw(0), 0)) };
 }
 struct Outgoing {
@@ -325,7 +328,7 @@ pub fn start_file_drag_with_options(
                 }
             }
         });
-        app.create_waker().wake();
+        crate::frame::main_wake(&app).notify();
     });
     if dispatched.is_err() {
         cancel_outgoing(Some(source));

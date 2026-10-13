@@ -25,6 +25,7 @@ openharmony-ability-plugin-window = { version = "1.0.0-beta.1" }
 futures-executor = { version = "0.3", features = ["thread-pool"] }
 futures-channel = "0.3"
 ohos-fileuri-binding = "0.1"
+ohos-vsync-binding = "0.3"
 ohos-fileshare-binding = "0.2.4"
 openharmony-ability-plugin-clipboard = "1.0.0-beta.0"
 openharmony-ability-plugin-url = "1.0.0-beta.1"

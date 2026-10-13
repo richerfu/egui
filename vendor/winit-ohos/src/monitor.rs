@@ -38,14 +38,14 @@ impl MonitorHandleProvider for Monitor {
     }
 }
 pub(crate) fn all() -> Vec<MonitorHandle> {
-    static CACHE: std::sync::OnceLock<
-        std::sync::Mutex<Option<(std::time::Instant, Vec<MonitorHandle>)>>,
-    > = std::sync::OnceLock::new();
+    type CachedMonitors = Option<(std::time::Instant, Vec<MonitorHandle>)>;
+    static CACHE: std::sync::OnceLock<std::sync::Mutex<CachedMonitors>> =
+        std::sync::OnceLock::new();
     let mut cache = CACHE.get_or_init(Default::default).lock().unwrap();
-    if let Some((time, monitors)) = &*cache {
-        if time.elapsed().as_millis() < 500 {
-            return monitors.clone();
-        }
+    if let Some((time, monitors)) = &*cache
+        && time.elapsed().as_millis() < 500
+    {
+        return monitors.clone();
     }
     let monitors = query();
     *cache = Some((std::time::Instant::now(), monitors.clone()));
@@ -74,7 +74,7 @@ fn query() -> Vec<MonitorHandle> {
                     .name
                     .iter()
                     .take_while(|c| **c != 0)
-                    .map(|c| *c as u8)
+                    .map(|c| c.to_ne_bytes()[0])
                     .collect();
                 MonitorHandle(Arc::new(Monitor {
                     id: d.id,

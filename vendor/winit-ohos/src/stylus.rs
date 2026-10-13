@@ -19,6 +19,22 @@ pub(crate) fn tablet_data(pen: StylusInputData) -> TabletToolData {
         ..Default::default()
     }
 }
+pub(crate) fn tool_kind(
+    tool: openharmony_ability::xcomponent::TouchPointTool,
+) -> Option<winit_core::event::TabletToolKind> {
+    use openharmony_ability::xcomponent::TouchPointTool as Native;
+    use winit_core::event::TabletToolKind as Tool;
+    Some(match tool {
+        Native::Pen => Tool::Pen,
+        Native::Rubber => Tool::Eraser,
+        Native::Brush => Tool::Brush,
+        Native::Pencil => Tool::Pencil,
+        Native::Airbrush => Tool::Airbrush,
+        Native::Lens => Tool::Lens,
+        Native::Unknown | Native::Finger | Native::Mouse => return None,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -43,20 +59,4 @@ mod tests {
         assert_eq!(d.tilt, None);
         assert_eq!(d.twist, None);
     }
-}
-
-pub(crate) fn tool_kind(
-    tool: openharmony_ability::xcomponent::TouchPointTool,
-) -> Option<winit_core::event::TabletToolKind> {
-    use openharmony_ability::xcomponent::TouchPointTool as Native;
-    use winit_core::event::TabletToolKind as Tool;
-    Some(match tool {
-        Native::Pen => Tool::Pen,
-        Native::Rubber => Tool::Eraser,
-        Native::Brush => Tool::Brush,
-        Native::Pencil => Tool::Pencil,
-        Native::Airbrush => Tool::Airbrush,
-        Native::Lens => Tool::Lens,
-        Native::Unknown | Native::Finger | Native::Mouse => return None,
-    })
 }

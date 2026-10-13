@@ -7,7 +7,7 @@ backend and adapters share the same Rust types.
 
 | Directory | Source | Local changes |
 | --- | --- | --- |
-| `winit-ohos` | [ohos-rs/winit-ohos](https://github.com/ohos-rs/winit-ohos/tree/d53fcb015cf8f00c2d1e56d76c753757fc795557) | New winit error types; ability window IDs and events; XComponent surface size and safe areas; IME composition, editing and cursor updates; ArkUI keyboard Unicode/modifiers; mouse/touch deduplication, wheel units/phases and hover exit; release the application on shutdown; asynchronous OS clipboard and plugin commands; native child windows; incoming/outgoing file drags; surrounding-text IME editing; typed platform events. |
+| `winit-ohos` | [ohos-rs/winit-ohos `feat/egui-ohos-adaptation`](https://github.com/ohos-rs/winit-ohos/tree/d57ae21d1a23a5b194fbe58af6f61f65579f97d8) | Sources are unchanged. The manifest uses registry requirements resolved through the root patches; the README links to this workspace. |
 | `openharmony-ability` | [richerfu/openharmony-ability](https://github.com/richerfu/openharmony-ability/tree/06e041fa81862410bee03b7856dc09a489f49639) | Typed RGBA custom cursors and runtime 2in1 icons, native drag previews/results and Copy/Move negotiation, pen metadata; retained MIT/Apache licences. |
 | `ohos-arkui-binding` | crates.io 0.4.1 | Owned native drag completion result, operation and preview hotspot. |
 | `ohos-xcomponent-binding` | crates.io 0.5.1 | Query tool type by touch-point index, capture tilt. |
