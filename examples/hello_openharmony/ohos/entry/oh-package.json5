@@ -1,0 +1,18 @@
+{
+  "name": "entry",
+  "version": "0.1.0",
+  "dependencies": {
+    "@ohos-rs/ability": "file:../native_ability",
+    "@ohos-rs/ability-plugin-window": "file:../plugins/window",
+    "@ohos-rs/ability-plugin-clipboard": "file:../plugins/clipboard",
+    "@ohos-rs/ability-plugin-url": "file:../plugins/url",
+    "@ohos-rs/ability-plugin-files": "file:../plugins/files",
+    "@ohos-rs/ability-plugin-app-control": "file:../plugins/app-control",
+    "@ohos-rs/ability-plugin-permission": "file:../plugins/permission",
+    "@ohos-rs/ability-plugin-menu": "file:../plugins/menu",
+    "@ohos-rs/ability-plugin-notification": "file:../plugins/notification",
+    "@ohos-rs/ability-plugin-process": "file:../plugins/process",
+    "@ohos-rs/ability-plugin-system-state": "file:../plugins/system-state",
+    "@ohos-rs/ability-plugin-accessibility": "file:../plugins/accessibility"
+  }
+}

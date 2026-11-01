@@ -1,0 +1,37 @@
+[package]
+name = "hello_openharmony"
+version = "0.1.0"
+authors = ["richerfu <southorange0929@foxmail.com>"]
+license = "MIT OR Apache-2.0"
+edition.workspace = true
+rust-version.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+
+[features]
+wgpu = ["eframe/wgpu"]
+
+[dependencies]
+eframe = { workspace = true, features = ["glow", "default_fonts", "accesskit"] }
+egui_demo_lib = { workspace = true, features = ["jiff"] }
+
+# For image support:
+egui_extras = { workspace = true, features = ["default", "image"] }
+
+log = { workspace = true }
+winit = { workspace = true, features = ["extended-plugins"] }
+[target.'cfg(target_env = "ohos")'.dependencies]
+ohos-hilog-binding = { version = "0.2.3", features = ["log"] }
+openharmony-ability = { workspace = true }
+openharmony-ability-derive = { workspace = true }
+napi-ohos = { version = "1.2" }
+napi-derive-ohos = { version = "1.2" }
+
+[build-dependencies]
+napi-build-ohos = "1.2"

@@ -432,6 +432,16 @@ pub struct NativeOptions {
     #[cfg(target_os = "android")]
     pub android_app: Option<winit::platform::android::activity::AndroidApp>,
 
+    /// `OpenHarmony` application for `winit`'s event loop.
+    ///
+    /// This value is required on `OpenHarmony` to correctly create the event loop. See
+    /// [`EventLoopBuilder::build`] and [`with_openharmony_app`] for details.
+    ///
+    /// [`EventLoopBuilder::build`]: winit::event_loop::EventLoopBuilder::build
+    /// [`with_openharmony_app`]: winit::platform::ohos::EventLoopBuilderExtOpenHarmony::with_openharmony_app
+    #[cfg(target_env = "ohos")]
+    pub openharmony_app: Option<winit::platform::ohos::ability::OpenHarmonyApp>,
+
     /// Per-viewport window and raw-input callbacks, see [`crate::ViewportHooks`].
     #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
     pub viewport_hooks: Option<std::sync::Arc<dyn crate::ViewportHooks>>,
@@ -459,6 +469,9 @@ impl Clone for NativeOptions {
 
             #[cfg(target_os = "android")]
             android_app: self.android_app.clone(),
+
+            #[cfg(target_env = "ohos")]
+            openharmony_app: self.openharmony_app.clone(),
 
             #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
             viewport_hooks: self.viewport_hooks.clone(),
@@ -510,6 +523,9 @@ impl Default for NativeOptions {
 
             #[cfg(target_os = "android")]
             android_app: None,
+
+            #[cfg(target_env = "ohos")]
+            openharmony_app: None,
 
             #[cfg(any(feature = "glow", feature = "wgpu_no_default_features"))]
             viewport_hooks: None,
@@ -946,7 +962,11 @@ impl Frame {
         };
 
         cfg_select! {
-            all(any(feature = "wayland", feature = "x11"), target_os = "linux") => {
+            all(
+                any(feature = "wayland", feature = "x11"),
+                target_os = "linux",
+                not(target_env = "ohos")
+            ) => {
                 use winit::platform::startup_notify::WindowExtStartupNotify as _;
                 if let Err(err) = window.request_activation_token() {
                     log::debug!("request_activation_token failed: {err}");

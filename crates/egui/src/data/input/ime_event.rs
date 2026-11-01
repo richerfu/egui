@@ -45,6 +45,15 @@ pub enum ImeEvent {
         after_bytes: usize,
     },
 
+    /// Set the editor selection using UTF-16 document offsets.
+    #[cfg(target_env = "ohos")]
+    Selection { start: usize, end: usize },
+
+    /// Delete UTF-16 units before/after the current selection. Whole Unicode
+    /// characters are removed if a count intersects a surrogate pair.
+    #[cfg(target_env = "ohos")]
+    DeleteSurroundingUtf16 { before: usize, after: usize },
+
     /// Notifies when the IME was disabled.
     #[deprecated = "No longer used by egui"]
     Disabled,

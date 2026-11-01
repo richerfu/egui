@@ -1,0 +1,12 @@
+{
+  "string": [
+    {
+      "name": "app_name",
+      "value": "egui OHOS"
+    },
+    {
+      "name": "clipboard_reason",
+      "value": "Paste text you copied into egui."
+    }
+  ]
+}

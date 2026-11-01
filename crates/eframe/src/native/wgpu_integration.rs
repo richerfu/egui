@@ -179,7 +179,7 @@ impl<'app> WgpuWinitApp<'app> {
         }
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_env = "ohos"))]
     fn recreate_window(&self, event_loop: &ActiveEventLoop, running: &WgpuWinitRunning<'app>) {
         let SharedState {
             egui_ctx,
@@ -207,12 +207,27 @@ impl<'app> WgpuWinitApp<'app> {
         );
     }
 
-    #[cfg(target_os = "android")]
+    #[cfg(any(target_os = "android", target_env = "ohos"))]
     fn drop_window(&mut self) -> Result<(), egui_wgpu::WgpuError> {
         if let Some(running) = &mut self.running {
             let mut shared = running.shared.borrow_mut();
-            shared.viewports.remove(&ViewportId::ROOT);
-            pollster::block_on(shared.painter.set_window(ViewportId::ROOT, None))?;
+            #[cfg(target_os = "android")]
+            {
+                shared.viewports.remove(&ViewportId::ROOT);
+                pollster::block_on(shared.painter.set_window(ViewportId::ROOT, None))?;
+            }
+            #[cfg(target_env = "ohos")]
+            {
+                let ids: Vec<ViewportId> = shared.viewports.keys().copied().collect();
+                for viewport in shared.viewports.values_mut() {
+                    viewport.window = None;
+                    viewport.egui_winit = None;
+                }
+                shared.viewport_from_window.clear();
+                for id in ids {
+                    pollster::block_on(shared.painter.set_window(id, None))?;
+                }
+            }
         }
         Ok(())
     }
@@ -269,7 +284,15 @@ impl<'app> WgpuWinitApp<'app> {
 
         {
             profiling::scope!("set_window");
-            pollster::block_on(painter.set_window(ViewportId::ROOT, Some(Arc::clone(&window))))?;
+            #[cfg(target_env = "ohos")]
+            let has_window_handle = window.window_handle().is_ok();
+            #[cfg(not(target_env = "ohos"))]
+            let has_window_handle = true;
+            if has_window_handle {
+                pollster::block_on(
+                    painter.set_window(ViewportId::ROOT, Some(Arc::clone(&window))),
+                )?;
+            }
         }
 
         let wgpu_render_state = painter.render_state();
@@ -461,7 +484,7 @@ impl WinitApp for WgpuWinitApp<'_> {
         log::debug!("Event::Resumed");
 
         let running = if let Some(running) = &self.running {
-            #[cfg(target_os = "android")]
+            #[cfg(any(target_os = "android", target_env = "ohos"))]
             self.recreate_window(event_loop, running);
             running
         } else {
@@ -498,7 +521,7 @@ impl WinitApp for WgpuWinitApp<'_> {
     }
 
     fn suspended(&mut self, _: &ActiveEventLoop) -> crate::Result<EventResult> {
-        #[cfg(target_os = "android")]
+        #[cfg(any(target_os = "android", target_env = "ohos"))]
         self.drop_window()?;
         Ok(EventResult::Save)
     }
@@ -680,6 +703,10 @@ impl WgpuWinitRunning<'_> {
             let Some(window) = window else {
                 return Ok(EventResult::Wait);
             };
+            #[cfg(target_env = "ohos")]
+            if window.window_handle().is_err() {
+                return Ok(EventResult::Wait);
+            }
             egui_winit::update_viewport_info(info, &integration.egui_ctx, window, false);
 
             // A hidden window is not painted, since nothing would be shown — unless someone
@@ -1041,6 +1068,13 @@ impl WgpuWinitRunning<'_> {
                 }
             }
 
+            #[cfg(target_env = "ohos")]
+            winit::event::WindowEvent::Destroyed => {
+                if let Some(id) = viewport_id {
+                    let _ = pollster::block_on(shared.painter.set_window(id, None));
+                }
+            }
+
             winit::event::WindowEvent::CloseRequested => {
                 if viewport_id == Some(ViewportId::ROOT) && integration.should_close() {
                     log::debug!(
@@ -1151,8 +1185,14 @@ impl Viewport {
 
                 let window = Arc::new(window);
 
-                if let Err(err) =
-                    pollster::block_on(painter.set_window(viewport_id, Some(Arc::clone(&window))))
+                #[cfg(target_env = "ohos")]
+                let has_window_handle = window.window_handle().is_ok();
+                #[cfg(not(target_env = "ohos"))]
+                let has_window_handle = true;
+                if has_window_handle
+                    && let Err(err) = pollster::block_on(
+                        painter.set_window(viewport_id, Some(Arc::clone(&window))),
+                    )
                 {
                     log::error!("on set_window: viewport_id {viewport_id:?} {err}");
                 }
@@ -1314,6 +1354,25 @@ fn render_immediate_viewport(
     let (Some(egui_winit), Some(window)) = (&mut viewport.egui_winit, &viewport.window) else {
         return;
     };
+
+    #[cfg(target_env = "ohos")]
+    if window.window_handle().is_err() {
+        if let Some(render_state) = painter.render_state() {
+            let mut renderer = render_state.renderer.write();
+            #[expect(clippy::iter_over_hash_type)]
+            for (id, deltas) in &viewport.pending_delta.set {
+                for delta in deltas {
+                    renderer.update_texture(&render_state.device, &render_state.queue, *id, delta);
+                }
+            }
+            #[expect(clippy::iter_over_hash_type)]
+            for id in &viewport.pending_delta.free {
+                renderer.free_texture(id);
+            }
+        }
+        viewport.pending_delta.clear();
+        return;
+    }
 
     {
         profiling::scope!("set_window");

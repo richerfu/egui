@@ -87,6 +87,15 @@ fn parse_locale(locale: &str) -> Option<Language> {
 
 fn load_system_fonts() -> SystemFonts {
     let start = std::time::Instant::now();
+    #[cfg(target_env = "ohos")]
+    let mut collection = Collection::new(CollectionOptions {
+        shared: false,
+        system_fonts: false,
+    });
+    #[cfg(target_env = "ohos")]
+    load_ohos_system_fonts(&mut collection);
+
+    #[cfg(not(target_env = "ohos"))]
     let collection = Collection::new(CollectionOptions {
         shared: false,
         system_fonts: true,
@@ -95,6 +104,96 @@ fn load_system_fonts() -> SystemFonts {
     SystemFonts {
         collection,
         source_cache: SourceCache::new(SourceCacheOptions::default()),
+    }
+}
+
+#[cfg(target_env = "ohos")]
+fn load_ohos_system_fonts(collection: &mut Collection) {
+    collection.load_fonts_from_paths(["/system/fonts"]);
+
+    let ids_for = |collection: &mut Collection, names: &[&str]| -> Vec<fontique::FamilyId> {
+        names
+            .iter()
+            .filter_map(|name| collection.family_id(name))
+            .collect()
+    };
+
+    for (generic, names) in [
+        (
+            GenericFamily::SansSerif,
+            &["HarmonyOS Sans", "Noto Sans", "Roboto"][..],
+        ),
+        (
+            GenericFamily::SystemUi,
+            &["HarmonyOS Sans", "Noto Sans", "Roboto"][..],
+        ),
+        (
+            GenericFamily::Monospace,
+            &["Noto Sans Mono", "HarmonyOS Sans"][..],
+        ),
+        (GenericFamily::Serif, &["Noto Serif", "HarmonyOS Sans"][..]),
+        (
+            GenericFamily::Emoji,
+            &["HMOS Color Emoji", "Noto Color Emoji"][..],
+        ),
+        (
+            GenericFamily::Math,
+            &["Noto Sans Math", "Noto Sans", "HarmonyOS Sans"][..],
+        ),
+    ] {
+        let ids = ids_for(collection, names);
+        if !ids.is_empty() {
+            collection.set_generic_families(generic, ids.into_iter());
+        }
+    }
+
+    for (locale, names) in [
+        (
+            Some("zh-SG"),
+            &[
+                "HarmonyOS Sans SC",
+                "Noto Sans CJK SC",
+                "Noto Sans CJK",
+                "HarmonyOS Sans TC",
+            ][..],
+        ),
+        (
+            Some("zh-TW"),
+            &[
+                "HarmonyOS Sans TC",
+                "Noto Sans CJK TC",
+                "Noto Sans CJK",
+                "HarmonyOS Sans SC",
+            ][..],
+        ),
+        (
+            Some("ja"),
+            &[
+                "Noto Sans CJK JP",
+                "Noto Sans CJK",
+                "HarmonyOS Sans SC",
+                "HarmonyOS Sans TC",
+            ][..],
+        ),
+        (
+            Some("ko"),
+            &[
+                "Noto Sans CJK KR",
+                "Noto Sans CJK",
+                "HarmonyOS Sans SC",
+                "HarmonyOS Sans TC",
+            ][..],
+        ),
+        (
+            None,
+            &["HarmonyOS Sans SC", "HarmonyOS Sans TC", "Noto Sans CJK"][..],
+        ),
+    ] {
+        let ids = ids_for(collection, names);
+        if !ids.is_empty() {
+            let parsed = locale.and_then(|tag| Language::parse(tag).ok());
+            collection.set_fallbacks(FallbackKey::new(HAN, parsed.as_ref()), ids.into_iter());
+        }
     }
 }
 
@@ -147,7 +246,15 @@ impl FontProvider for SystemFontProvider {
                 .map(QueryFamily::Generic),
             );
             find_font(&mut query, base_char)
-        }?;
+        };
+        #[cfg(target_env = "ohos")]
+        let font = font.or_else(|| {
+            let all_families: Vec<String> = collection.family_names().map(str::to_owned).collect();
+            let mut query = collection.query(source_cache);
+            query.set_families(all_families.iter().map(|s| QueryFamily::Named(s.as_str())));
+            find_font(&mut query, base_char)
+        });
+        let font = font?;
 
         let family_name = collection.family_name(font.family.0).unwrap_or("unknown");
         let name = format!("system:{family_name}:{}:{}", font.family.1, font.index);

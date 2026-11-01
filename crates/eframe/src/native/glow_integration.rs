@@ -678,6 +678,10 @@ impl GlowWinitRunning<'_> {
             let Some(window) = viewport.window.as_ref() else {
                 return Ok(EventResult::Wait);
             };
+            #[cfg(target_env = "ohos")]
+            if viewport.gl_surface.is_none() {
+                return Ok(EventResult::Wait);
+            }
             egui_winit::update_viewport_info(&mut viewport.info, &egui_ctx, window, false);
 
             // A hidden window is not painted, since nothing would be shown — unless someone
@@ -1069,6 +1073,16 @@ impl GlowWinitRunning<'_> {
                 }
             }
 
+            #[cfg(target_env = "ohos")]
+            winit::event::WindowEvent::Destroyed => {
+                if let Some(id) = viewport_id
+                    && let Some(viewport) = glutin.viewports.get_mut(&id)
+                {
+                    // Ability releases the XComponent as soon as this callback returns.
+                    viewport.gl_surface = None;
+                }
+            }
+
             winit::event::WindowEvent::CloseRequested => {
                 if viewport_id == Some(ViewportId::ROOT) && self.integration.should_close() {
                     log::debug!(
@@ -1418,6 +1432,13 @@ impl GlutinWindowContext {
             egui_winit.set_clipboard_shortcuts(self.clipboard_shortcuts);
             egui_winit
         });
+
+        #[cfg(target_env = "ohos")]
+        if window.window_handle().is_err() {
+            self.viewport_from_window.insert(window.id(), viewport_id);
+            self.window_from_viewport.insert(viewport_id, window.id());
+            return Ok(());
+        }
 
         if viewport.gl_surface.is_none() {
             log::debug!("Creating a gl_surface for viewport {viewport_id:?}");
@@ -1845,6 +1866,23 @@ fn render_immediate_viewport(
     viewport.pending_delta.append(textures_delta);
 
     viewport.info.events.clear(); // they should have been processed
+
+    #[cfg(target_env = "ohos")]
+    if viewport.gl_surface.is_none() {
+        let mut painter = painter.borrow_mut();
+        #[expect(clippy::iter_over_hash_type)]
+        for (id, deltas) in &viewport.pending_delta.set {
+            for delta in deltas {
+                painter.set_texture(*id, delta);
+            }
+        }
+        #[expect(clippy::iter_over_hash_type)]
+        for id in &viewport.pending_delta.free {
+            painter.free_texture(*id);
+        }
+        viewport.pending_delta.clear();
+        return;
+    }
 
     let (Some(egui_winit), Some(window), Some(gl_surface)) = (
         &mut viewport.egui_winit,

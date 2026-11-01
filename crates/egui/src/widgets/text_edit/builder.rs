@@ -1618,6 +1618,70 @@ fn events(
                             text.delete_surrounding_chars(cursor_range, before_chars, after_chars),
                         ))
                     }
+                    #[cfg(target_env = "ohos")]
+                    ImeEvent::Selection { start, end } => {
+                        ime_receipt_before = Some(committed_surrounding_text(
+                            text,
+                            &cursor_range,
+                            &state.cursor_purpose,
+                            password,
+                        ));
+                        let _ = clear_preedit_text(text, &cursor_range);
+                        state.cursor_purpose = TextEditCursorPurpose::Selection;
+                        let index = |offset| {
+                            let mut units = 0;
+                            text.as_str()
+                                .chars()
+                                .take_while(|ch| {
+                                    units += ch.len_utf16();
+                                    units <= offset
+                                })
+                                .count()
+                        };
+                        Some(CursorMutation::Selection(CCursorRange::two(
+                            CCursor::new(index(*start)),
+                            CCursor::new(index(*end)),
+                        )))
+                    }
+                    #[cfg(target_env = "ohos")]
+                    ImeEvent::DeleteSurroundingUtf16 { before, after } => {
+                        ime_receipt_before = Some(committed_surrounding_text(
+                            text,
+                            &cursor_range,
+                            &state.cursor_purpose,
+                            password,
+                        ));
+                        let was_composing = state.cursor_purpose.is_ime_composition();
+                        let ccursor = clear_preedit_text(text, &cursor_range);
+                        let cursor_range = if was_composing {
+                            CCursorRange::one(ccursor)
+                        } else {
+                            cursor_range
+                        };
+                        state.cursor_purpose = TextEditCursorPurpose::Selection;
+                        let range = cursor_range.as_sorted_char_range();
+                        let chars: Vec<_> = text.as_str().chars().collect();
+                        let mut start = range.start.0.min(chars.len());
+                        let mut end = range.end.0.min(chars.len());
+                        if start == end {
+                            let mut units = 0;
+                            while start > 0 && units < *before {
+                                start -= 1;
+                                units += chars[start].len_utf16();
+                            }
+                            units = 0;
+                            while end < chars.len() && units < *after {
+                                units += chars[end].len_utf16();
+                                end += 1;
+                            }
+                        }
+                        text.delete_char_range(
+                            epaint::text::CharIndex(start)..epaint::text::CharIndex(end),
+                        );
+                        Some(CursorMutation::Selection(CCursorRange::one(CCursor::new(
+                            start,
+                        ))))
+                    }
                 }
             }
 

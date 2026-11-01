@@ -1,6 +1,10 @@
+#[cfg(all(target_env = "ohos", feature = "clipboard"))]
+mod ohos;
+
 use raw_window_handle::RawDisplayHandle;
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -14,6 +18,7 @@ use raw_window_handle::RawDisplayHandle;
 ))]
 use crate::clipboard_bridge::EncodedPng;
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -40,12 +45,13 @@ use crate::clipboard_bridge::{
 /// `begin_load_*` handles instead so a slow peer cannot block the event loop.
 pub struct Clipboard {
     #[cfg(all(
-        not(any(target_os = "android", target_os = "ios")),
+        not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
         feature = "arboard",
     ))]
     arboard: Option<arboard::Clipboard>,
 
     #[cfg(all(
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -60,6 +66,7 @@ pub struct Clipboard {
     /// The clipboard of winit's Wayland event loop, which uses winit's own data device.
     /// When it is set, smithay-clipboard is not started.
     #[cfg(all(
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -74,6 +81,7 @@ pub struct Clipboard {
 
     /// Whether the display handle was Wayland even if winit's clipboard was unavailable.
     #[cfg(all(
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -85,6 +93,9 @@ pub struct Clipboard {
         feature = "clipboard",
     ))]
     wayland_display: bool,
+
+    #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+    ohos: Option<ohos::Clipboard>,
 
     /// Fallback manual clipboard.
     clipboard: String,
@@ -100,6 +111,7 @@ impl Clipboard {
     #[expect(unsafe_code)]
     pub unsafe fn new(_raw_display_handle: Option<RawDisplayHandle>) -> Self {
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -113,6 +125,7 @@ impl Clipboard {
         let wayland_display = matches!(&_raw_display_handle, Some(RawDisplayHandle::Wayland(_)));
 
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -130,7 +143,7 @@ impl Clipboard {
             let winit_wayland = init_winit_wayland_clipboard(_raw_display_handle);
             return Self {
                 #[cfg(all(
-                    not(any(target_os = "android", target_os = "ios")),
+                    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
                     feature = "arboard",
                 ))]
                 arboard: None,
@@ -144,12 +157,13 @@ impl Clipboard {
 
         Self {
             #[cfg(all(
-                not(any(target_os = "android", target_os = "ios")),
+                not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
                 feature = "arboard",
             ))]
             arboard: init_arboard(),
 
             #[cfg(all(
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -163,6 +177,7 @@ impl Clipboard {
             smithay: unsafe { init_smithay_clipboard(_raw_display_handle) },
 
             #[cfg(all(
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -175,6 +190,7 @@ impl Clipboard {
             ))]
             winit_wayland: None,
             #[cfg(all(
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -187,7 +203,40 @@ impl Clipboard {
             ))]
             wayland_display,
 
+            #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+            ohos: None,
+
             clipboard: Default::default(),
+        }
+    }
+
+    #[cfg(target_env = "ohos")]
+    pub(crate) fn init_ohos(&mut self, app: &winit::platform::ohos::ability::OpenHarmonyApp) {
+        #[cfg(feature = "clipboard")]
+        if self.ohos.is_none() {
+            self.ohos = Some(ohos::Clipboard::new(app.clone()));
+        }
+        #[cfg(not(feature = "clipboard"))]
+        let _ = app;
+    }
+
+    #[cfg(target_env = "ohos")]
+    pub(crate) fn drain_pastes(&self, ctx: &egui::Context, input: &mut egui::RawInput) {
+        #[cfg(feature = "clipboard")]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.drain_pastes(ctx, input);
+        }
+        #[cfg(not(feature = "clipboard"))]
+        let _ = (ctx, input);
+    }
+
+    #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+    pub(crate) fn request_paste(&self, ctx: &egui::Context) -> bool {
+        if let Some(clipboard) = &self.ohos {
+            clipboard.request_paste(ctx);
+            true
+        } else {
+            false
         }
     }
 
@@ -197,6 +246,7 @@ impl Clipboard {
     /// ownership claims on the triggering input turn. Other platforms keep their existing
     /// synchronous clipboard path.
     #[cfg(all(
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -218,6 +268,7 @@ impl Clipboard {
     /// If winit did not initialize its clipboard for a Wayland display, the event path must fail
     /// closed instead of calling a blocking arboard/data-control read as a substitute.
     #[cfg(all(
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -240,11 +291,24 @@ impl Clipboard {
     /// absent or non-text regular selection may be represented by `None`, which lets the caller
     /// consider an image paste.
     #[cfg_attr(
-        not(feature = "clipboard"),
+        any(
+            not(feature = "clipboard"),
+            target_os = "android",
+            target_os = "ios",
+            target_env = "ohos",
+        ),
         expect(clippy::needless_pass_by_ref_mut, clippy::unnecessary_wraps)
     )]
     pub fn get(&mut self) -> Option<String> {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos
+            && let Some(text) = clipboard.get()
+        {
+            return Some(text);
+        }
+
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -272,6 +336,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -294,7 +359,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -321,7 +386,15 @@ impl Clipboard {
     /// This does not have an input-origin token. The egui event path claims ownership with
     /// winit's `claim_text` on the triggering input serial instead.
     pub fn set_text(&mut self, text: String) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.set_text(text.clone());
+            self.clipboard = text;
+            return;
+        }
+
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -344,6 +417,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -359,7 +433,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -384,11 +458,17 @@ impl Clipboard {
     /// path is the `State` regular paste event, which uses a bounded combined read and the
     /// off-thread PNG codec. Non-Wayland synchronous paste keeps its existing fallback.
     #[cfg_attr(
-        not(feature = "clipboard"),
+        any(
+            not(feature = "clipboard"),
+            target_os = "android",
+            target_os = "ios",
+            target_env = "ohos",
+        ),
         expect(clippy::needless_pass_by_ref_mut, clippy::unused_self)
     )]
     pub fn get_image(&mut self) -> Option<egui::ColorImage> {
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -407,7 +487,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -429,11 +509,27 @@ impl Clipboard {
     }
 
     #[cfg_attr(
-        not(feature = "clipboard"),
-        expect(clippy::needless_pass_by_ref_mut, clippy::unused_self)
+        any(
+            not(feature = "clipboard"),
+            target_os = "android",
+            target_os = "ios",
+            target_env = "ohos",
+        ),
+        expect(clippy::needless_pass_by_ref_mut)
+    )]
+    #[cfg_attr(
+        any(not(feature = "clipboard"), target_os = "android", target_os = "ios"),
+        expect(clippy::unused_self)
     )]
     pub fn set_image(&mut self, image: &egui::ColorImage) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if let Some(clipboard) = &self.ohos {
+            clipboard.set_image(image);
+            return;
+        }
+
         #[cfg(all(
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -453,7 +549,7 @@ impl Clipboard {
         }
 
         #[cfg(all(
-            not(any(target_os = "android", target_os = "ios")),
+            not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
             feature = "arboard",
         ))]
         if let Some(clipboard) = &mut self.arboard {
@@ -473,12 +569,15 @@ impl Clipboard {
 
 // The X11/Wayland PRIMARY selection: filled in by selecting text, pasted with the middle mouse button.
 cfg_select! {
-    any(
-        target_os = "linux",
-        target_os = "dragonfly",
-        target_os = "freebsd",
-        target_os = "netbsd",
-        target_os = "openbsd"
+    all(
+        not(target_env = "ohos"),
+        any(
+            target_os = "linux",
+            target_os = "dragonfly",
+            target_os = "freebsd",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )
     ) => {
         #[cfg_attr(
             not(any(feature = "arboard", feature = "smithay-clipboard")),
@@ -602,7 +701,7 @@ cfg_select! {
 /// Pulled out as its own pure function (rather than inlined in the two `match`es above) so it
 /// can be unit-tested without touching the real OS clipboard, which CI can't rely on.
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 fn is_expected_content_absence(err: &arboard::Error) -> bool {
@@ -610,7 +709,7 @@ fn is_expected_content_absence(err: &arboard::Error) -> bool {
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 fn color_image_from_arboard(image: &arboard::ImageData<'_>) -> egui::ColorImage {
@@ -619,7 +718,7 @@ fn color_image_from_arboard(image: &arboard::ImageData<'_>) -> egui::ColorImage 
 
 /// arboard expects unmultiplied alpha, but [`egui::Color32`] is premultiplied.
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 fn arboard_from_color_image(image: &egui::ColorImage) -> arboard::ImageData<'static> {
@@ -641,6 +740,7 @@ fn arboard_from_color_image(image: &egui::ColorImage) -> arboard::ImageData<'sta
 /// `Clipboard` methods share the same per-seat data device and PRIMARY device. It is only
 /// constructed when winit initialized a Wayland clipboard.
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -657,6 +757,7 @@ pub(crate) struct WaylandPasteTransport {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -744,6 +845,7 @@ impl ClipboardTransport for WaylandPasteTransport {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -779,6 +881,7 @@ impl WaylandPasteTransport {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -808,6 +911,7 @@ fn paste_error_from_clipboard(error: &winit::platform::wayland::ClipboardError) 
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -824,6 +928,7 @@ enum WaylandPasteTransfer {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -838,6 +943,7 @@ enum WaylandPasteTransfer {
 struct WinitEncodedPng(winit::platform::wayland::PngBytes);
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -860,6 +966,7 @@ impl EncodedPng for WinitEncodedPng {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -881,6 +988,7 @@ fn paste_content_from_winit(content: winit::platform::wayland::ClipboardContent)
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -905,6 +1013,7 @@ fn paste_content_from_winit(
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -923,6 +1032,7 @@ fn finish_paste_content(
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -941,6 +1051,7 @@ fn finish_paste_content(
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -974,6 +1085,7 @@ impl PasteTransfer for WaylandPasteTransfer {
 }
 
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -998,7 +1110,7 @@ fn init_winit_wayland_clipboard(
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 fn init_arboard() -> Option<arboard::Clipboard> {
@@ -1019,6 +1131,7 @@ fn init_arboard() -> Option<arboard::Clipboard> {
 /// The display handle in `raw_display_handle` must remain valid for the
 /// lifetime of the returned `Clipboard`.
 #[cfg(all(
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -1050,7 +1163,7 @@ unsafe fn init_smithay_clipboard(
 }
 
 #[cfg(all(
-    not(any(target_os = "android", target_os = "ios")),
+    not(any(target_os = "android", target_os = "ios", target_env = "ohos")),
     feature = "arboard",
 ))]
 #[cfg(test)]

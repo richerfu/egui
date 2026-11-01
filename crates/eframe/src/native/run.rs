@@ -40,6 +40,9 @@ fn create_event_loop(native_options: &mut epi::NativeOptions) -> Result<EventLoo
     #[cfg(target_os = "android")]
     use winit::platform::android::EventLoopBuilderExtAndroid as _;
 
+    #[cfg(target_env = "ohos")]
+    use winit::platform::ohos::EventLoopBuilderExtOpenHarmony as _;
+
     profiling::function_scope!();
     let mut builder = winit::event_loop::EventLoop::with_user_event();
 
@@ -50,6 +53,13 @@ fn create_event_loop(native_options: &mut epi::NativeOptions) -> Result<EventLoo
                 "`NativeOptions` is missing required `android_app`",
             ))
         })?);
+
+    #[cfg(target_env = "ohos")]
+    builder.with_openharmony_app(native_options.openharmony_app.take().ok_or_else(|| {
+        crate::Error::AppCreation(Box::from(
+            "`NativeOptions` is missing required `openharmony_app`",
+        ))
+    })?);
 
     if let Some(hook) = core::mem::take(&mut native_options.event_loop_builder) {
         hook(&mut builder);
@@ -63,7 +73,7 @@ fn create_event_loop(native_options: &mut epi::NativeOptions) -> Result<EventLoo
 ///
 /// We reuse the event-loop so we can support closing and opening an eframe window
 /// multiple times. This is just a limitation of winit.
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_env = "ohos")))]
 fn with_event_loop<R>(
     mut native_options: epi::NativeOptions,
     f: impl FnOnce(&mut EventLoop<UserEvent>, epi::NativeOptions) -> R,
@@ -95,6 +105,8 @@ struct WinitAppWrapper<T: WinitApp> {
     winit_app: T,
     return_result: Result<(), crate::Error>,
     run_and_return: bool,
+    #[cfg(target_env = "ohos")]
+    surfaces_available: bool,
 }
 
 impl<T: WinitApp> WinitAppWrapper<T> {
@@ -105,6 +117,8 @@ impl<T: WinitApp> WinitAppWrapper<T> {
             winit_app,
             return_result: Ok(()),
             run_and_return,
+            #[cfg(target_env = "ohos")]
+            surfaces_available: false,
         }
     }
 
@@ -170,6 +184,16 @@ impl<T: WinitApp> WinitAppWrapper<T> {
             EventResult::CloseRequested => {
                 // The windows need to be dropped whilst the event loop is running to allow for proper cleanup.
                 self.winit_app.save_and_destroy();
+                #[cfg(target_env = "ohos")]
+                {
+                    // Ability owns the root XComponent. Dropping the Rust window
+                    // cannot generate Destroyed as it does on desktop, so finish
+                    // the loop after releasing the GPU and application resources.
+                    self.surfaces_available = false;
+                    self.windows_next_repaint_times.clear();
+                    self.windows_redraw_deadlines.clear();
+                    event_loop.exit();
+                }
                 event_result
             }
         });
@@ -303,6 +327,12 @@ impl<T: WinitApp> WinitAppWrapper<T> {
 
 impl<T: WinitApp> ApplicationHandler<UserEvent> for WinitAppWrapper<T> {
     fn suspended(&mut self, event_loop: &ActiveEventLoop) {
+        #[cfg(target_env = "ohos")]
+        {
+            self.surfaces_available = false;
+            self.windows_next_repaint_times.clear();
+            self.windows_redraw_deadlines.clear();
+        }
         profiling::scope!("Event::Suspended");
 
         event_loop_context::with_event_loop_context(event_loop, move || {
@@ -312,6 +342,10 @@ impl<T: WinitApp> ApplicationHandler<UserEvent> for WinitAppWrapper<T> {
     }
 
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        #[cfg(target_env = "ohos")]
+        {
+            self.surfaces_available = true;
+        }
         profiling::scope!("Event::Resumed");
 
         // Nb: Make sure this guard is dropped after this function returns.
@@ -412,6 +446,25 @@ impl<T: WinitApp> ApplicationHandler<UserEvent> for WinitAppWrapper<T> {
         window_id: WindowId,
         event: winit::event::WindowEvent,
     ) {
+        #[cfg(target_env = "ohos")]
+        {
+            if !self.surfaces_available {
+                return;
+            }
+            if matches!(event, winit::event::WindowEvent::Destroyed)
+                && self
+                    .winit_app
+                    .window_id_from_viewport_id(egui::ViewportId::ROOT)
+                    == Some(window_id)
+            {
+                self.winit_app.save_and_destroy();
+                self.surfaces_available = false;
+                self.windows_next_repaint_times.clear();
+                self.windows_redraw_deadlines.clear();
+                event_loop.exit();
+                return;
+            }
+        }
         profiling::function_scope!(egui_winit::short_window_event_description(&event));
 
         // Nb: Make sure this guard is dropped after this function returns.
@@ -430,7 +483,7 @@ impl<T: WinitApp> ApplicationHandler<UserEvent> for WinitAppWrapper<T> {
     }
 }
 
-#[cfg(not(target_os = "ios"))]
+#[cfg(not(any(target_os = "ios", target_env = "ohos")))]
 fn run_and_return(event_loop: &mut EventLoop<UserEvent>, winit_app: impl WinitApp) -> Result {
     use winit::platform::run_on_demand::EventLoopExtRunOnDemand as _;
 
@@ -445,12 +498,23 @@ fn run_and_return(event_loop: &mut EventLoop<UserEvent>, winit_app: impl WinitAp
 fn run_and_exit(event_loop: EventLoop<UserEvent>, winit_app: impl WinitApp) -> Result {
     log::trace!("Entering the winit event loop (run_app)…");
 
-    // When to repaint what window
-    let mut app = WinitAppWrapper::new(winit_app, false);
-    event_loop.run_app(&mut app)?;
+    #[cfg(target_env = "ohos")]
+    {
+        // OHOS returns immediately after registering the handler with Ability.
+        let app = Box::leak(Box::new(WinitAppWrapper::new(winit_app, true)));
+        event_loop.run_app(app)?;
+        Ok(())
+    }
 
-    log::debug!("winit event loop unexpectedly returned");
-    Ok(())
+    #[cfg(not(target_env = "ohos"))]
+    {
+        // When to repaint what window
+        let mut app = WinitAppWrapper::new(winit_app, false);
+        event_loop.run_app(&mut app)?;
+
+        log::debug!("winit event loop unexpectedly returned");
+        Ok(())
+    }
 }
 
 // ----------------------------------------------------------------------------
@@ -464,7 +528,7 @@ pub fn run_glow(
 ) -> Result {
     use super::glow_integration::GlowWinitApp;
 
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(any(target_os = "ios", target_env = "ohos")))]
     if native_options.run_and_return {
         return with_event_loop(native_options, |event_loop, native_options| {
             let glow_eframe =
@@ -503,7 +567,7 @@ pub fn run_wgpu(
 ) -> Result {
     use super::wgpu_integration::WgpuWinitApp;
 
-    #[cfg(not(target_os = "ios"))]
+    #[cfg(not(any(target_os = "ios", target_env = "ohos")))]
     if native_options.run_and_return {
         return with_event_loop(native_options, |event_loop, native_options| {
             let wgpu_eframe =

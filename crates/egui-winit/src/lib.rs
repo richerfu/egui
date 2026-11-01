@@ -30,6 +30,7 @@ mod clipboard_bridge;
     feature = "clipboard-image",
     feature = "clipboard",
     feature = "wayland",
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -52,6 +53,7 @@ mod ime_reset;
     not(target_os = "android"),
     not(target_os = "emscripten"),
     not(target_os = "redox"),
+    not(target_env = "ohos"),
 ))]
 mod ime_surrounding;
 mod output_selector;
@@ -151,6 +153,7 @@ pub struct State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -166,6 +169,7 @@ pub struct State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -189,6 +193,7 @@ pub struct State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -206,6 +211,7 @@ pub struct State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -222,6 +228,7 @@ pub struct State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -237,6 +244,7 @@ pub struct State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -278,6 +286,7 @@ pub struct State {
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
     ))]
     ime_surrounding: ime_surrounding::ImeSurroundingSync,
 
@@ -292,8 +301,13 @@ pub struct State {
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
     ))]
     ime_gate: ime_surrounding::ImeGate,
+
+    /// Cached outgoing IME surrounding text on `OpenHarmony` to avoid redundant N-API updates.
+    #[cfg(target_env = "ohos")]
+    ohos_ime_surrounding: Option<(String, usize, usize)>,
 
     // TODO(emilk): remove once we are on a winit with https://github.com/rust-windowing/winit/pull/4732
     #[cfg(target_os = "macos")]
@@ -398,6 +412,7 @@ enum OutputClaimOrigins {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -419,6 +434,7 @@ enum OutputClaimOrigin {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -432,6 +448,7 @@ enum OutputClaimOrigin {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -478,6 +495,7 @@ fn reset_ime_window_latches(
     feature = "clipboard-image",
     feature = "clipboard",
     feature = "wayland",
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -498,6 +516,7 @@ struct ImageCopyPending {
     feature = "clipboard-image",
     feature = "clipboard",
     feature = "wayland",
+    not(target_env = "ohos"),
     any(
         target_os = "linux",
         target_os = "dragonfly",
@@ -542,6 +561,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -574,6 +594,7 @@ impl State {
             #[cfg(all(
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -586,6 +607,7 @@ impl State {
             #[cfg(all(
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -598,6 +620,7 @@ impl State {
             #[cfg(all(
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -610,6 +633,7 @@ impl State {
             #[cfg(all(
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -623,6 +647,7 @@ impl State {
                 feature = "clipboard-image",
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -636,6 +661,7 @@ impl State {
                 feature = "clipboard-image",
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -664,6 +690,7 @@ impl State {
                 not(target_os = "android"),
                 not(target_os = "emscripten"),
                 not(target_os = "redox"),
+                not(target_env = "ohos"),
             ))]
             ime_surrounding: ime_surrounding::ImeSurroundingSync::default(),
             #[cfg(all(
@@ -673,8 +700,11 @@ impl State {
                 not(target_os = "android"),
                 not(target_os = "emscripten"),
                 not(target_os = "redox"),
+                not(target_env = "ohos"),
             ))]
             ime_gate: ime_surrounding::ImeGate::default(),
+            #[cfg(target_env = "ohos")]
+            ohos_ime_surrounding: None,
             #[cfg(target_os = "macos")]
             scroll_momentum_monitor: macos_scroll_momentum::ScrollMomentumMonitor::install(),
             #[cfg(target_os = "windows")]
@@ -685,6 +715,7 @@ impl State {
             feature = "clipboard-image",
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -717,6 +748,11 @@ impl State {
         event_loop_proxy: winit::event_loop::EventLoopProxy<T>,
     ) {
         profiling::function_scope!();
+
+        #[cfg(target_env = "ohos")]
+        if raw_window_handle::HasWindowHandle::window_handle(window).is_err() {
+            return;
+        }
 
         self.accesskit = Some(accesskit_winit::Adapter::with_event_loop_proxy(
             event_loop,
@@ -794,6 +830,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -809,6 +846,7 @@ impl State {
         #[cfg(not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -828,6 +866,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -842,6 +881,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -858,6 +898,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -872,6 +913,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -893,6 +935,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -907,6 +950,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -927,6 +971,7 @@ impl State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -944,6 +989,7 @@ impl State {
     #[cfg(not(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -956,6 +1002,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -976,6 +1023,7 @@ impl State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1011,6 +1059,7 @@ impl State {
     #[cfg(not(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1023,6 +1072,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1048,6 +1098,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1062,6 +1113,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1081,6 +1133,7 @@ impl State {
         #[cfg(not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1098,6 +1151,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1112,6 +1166,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1131,6 +1186,7 @@ impl State {
         #[cfg(not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1152,6 +1208,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1166,6 +1223,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1178,6 +1236,7 @@ impl State {
         #[cfg(not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1197,6 +1256,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1211,6 +1271,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1232,6 +1293,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1246,6 +1308,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1269,6 +1332,7 @@ impl State {
         #[cfg(not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1285,6 +1349,7 @@ impl State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1313,6 +1378,7 @@ impl State {
     #[cfg(all(
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1338,6 +1404,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1357,6 +1424,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1376,6 +1444,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1401,6 +1470,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1421,6 +1491,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1497,6 +1568,7 @@ impl State {
         feature = "clipboard-image",
         feature = "clipboard",
         feature = "wayland",
+        not(target_env = "ohos"),
         any(
             target_os = "linux",
             target_os = "dragonfly",
@@ -1513,9 +1585,15 @@ impl State {
     /// Start a non-blocking regular-clipboard paste on Wayland, or use the platform's
     /// synchronous compatibility path elsewhere.
     fn begin_regular_clipboard_paste(&mut self) {
+        #[cfg(all(target_env = "ohos", feature = "clipboard"))]
+        if self.clipboard.request_paste(&self.egui_ctx) {
+            return;
+        }
+
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1546,6 +1624,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1584,6 +1663,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1610,6 +1690,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1691,6 +1772,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1705,6 +1787,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1745,6 +1828,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1773,6 +1857,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1793,6 +1878,7 @@ impl State {
             feature = "clipboard-image",
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1911,6 +1997,7 @@ impl State {
         not(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1930,6 +2017,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -1975,6 +2063,7 @@ impl State {
         #[cfg(all(
             feature = "clipboard",
             feature = "wayland",
+            not(target_env = "ohos"),
             any(
                 target_os = "linux",
                 target_os = "dragonfly",
@@ -2095,6 +2184,16 @@ impl State {
             .or_default()
             .native_pixels_per_point = Some(window.scale_factor() as f32);
 
+        #[cfg(target_env = "ohos")]
+        {
+            use winit::platform::ohos::WindowExtOpenHarmony as _;
+            self.clipboard.init_ohos(window.openharmony_app());
+            self.clipboard
+                .drain_pastes(&self.egui_ctx, &mut self.egui_input);
+            let ppp = pixels_per_point(&self.egui_ctx, window);
+            self.egui_input.safe_area_insets = Some(safe_area::get_safe_area_insets(window, ppp));
+        }
+
         self.egui_input.take()
     }
 
@@ -2188,6 +2287,13 @@ impl State {
                 }
             }
             WindowEvent::CursorLeft { .. } => {
+                #[cfg(target_env = "ohos")]
+                if self.pointer_touch_id.is_some() {
+                    return EventResponse {
+                        repaint: false,
+                        consumed: false,
+                    };
+                }
                 self.pointer_pos_in_points = None;
                 self.egui_input.events.push(egui::Event::PointerGone);
                 EventResponse {
@@ -2236,6 +2342,24 @@ impl State {
                     ));
                 }
                 self.on_ime(ime);
+                #[cfg(target_env = "ohos")]
+                {
+                    use winit::platform::ohos::{ImeEdit, WindowExtOpenHarmony as _};
+                    for cmd in window.take_ime_edits() {
+                        match cmd {
+                            ImeEdit::Selection { start, end } => {
+                                self.egui_input.events.push(egui::Event::Ime(
+                                    egui::ImeEvent::Selection { start, end },
+                                ));
+                            }
+                            ImeEdit::DeleteSurrounding { before, after } => {
+                                self.egui_input.events.push(egui::Event::Ime(
+                                    egui::ImeEvent::DeleteSurroundingUtf16 { before, after },
+                                ));
+                            }
+                        }
+                    }
+                }
 
                 EventResponse {
                     repaint: true,
@@ -2295,6 +2419,7 @@ impl State {
                     not(target_os = "android"),
                     not(target_os = "emscripten"),
                     not(target_os = "redox"),
+                    not(target_env = "ohos"),
                 ))]
                 self.ime_gate.set_focused(focused);
                 if !focused {
@@ -2311,6 +2436,7 @@ impl State {
                         not(target_os = "android"),
                         not(target_os = "emscripten"),
                         not(target_os = "redox"),
+                        not(target_env = "ohos"),
                     ))]
                     self.clear_ime_surrounding_on_focus_loss(window);
                 }
@@ -2410,6 +2536,10 @@ impl State {
                     &mut self.ime_cursor_rect_px,
                     &mut self.old_ime_purpose,
                 );
+                #[cfg(target_env = "ohos")]
+                {
+                    self.ohos_ime_surrounding = None;
+                }
                 #[cfg(all(
                     feature = "wayland",
                     unix,
@@ -2417,6 +2547,7 @@ impl State {
                     not(target_os = "android"),
                     not(target_os = "emscripten"),
                     not(target_os = "redox"),
+                    not(target_env = "ohos"),
                 ))]
                 {
                     // A reused `State` must not retain this window's focus, external-veto or
@@ -2676,8 +2807,13 @@ impl State {
                     not(target_os = "android"),
                     not(target_os = "emscripten"),
                     not(target_os = "redox"),
+                    not(target_env = "ohos"),
                 ))]
                 self.ime_surrounding.forget_backend();
+                #[cfg(target_env = "ohos")]
+                {
+                    self.ohos_ime_surrounding = None;
+                }
             }
             winit::event::Ime::Preedit(text, active_range_bytes) => {
                 let active_range_chars = match *active_range_bytes {
@@ -2736,6 +2872,7 @@ impl State {
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
     ))]
     fn clear_ime_surrounding_on_focus_loss(&mut self, window: &Window) {
         // An X11 window in the same winit build has no Wayland toplevel and no surrounding-text
@@ -2770,6 +2907,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         ))]
         if ime_surrounding::is_wayland_window(window) {
             self.ime_gate.set_external_ime_allowed(allowed);
@@ -2801,6 +2939,7 @@ impl State {
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
     ))]
     fn sync_ime_surrounding_text(
         &mut self,
@@ -3000,6 +3139,11 @@ impl State {
                 }
                 winit::event::TouchPhase::Cancelled => {
                     self.pointer_touch_id = None;
+                    #[cfg(target_env = "ohos")]
+                    self.on_mouse_button_input(
+                        winit::event::ElementState::Released,
+                        winit::event::MouseButton::Left,
+                    );
                     self.pointer_pos_in_points = None;
                     self.egui_input.events.push(egui::Event::PointerGone);
                 }
@@ -3185,6 +3329,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
             any(feature = "x11", feature = "wayland")
         ))]
         {
@@ -3333,6 +3478,7 @@ impl State {
             not(all(
                 feature = "clipboard",
                 feature = "wayland",
+                not(target_env = "ohos"),
                 any(
                     target_os = "linux",
                     target_os = "dragonfly",
@@ -3381,6 +3527,20 @@ impl State {
                 | egui::OutputCommand::TextSelectionSettled(_)
                 | egui::OutputCommand::CopyImage(_) => {}
                 egui::OutputCommand::OpenUrl(open_url) => {
+                    #[cfg(all(target_env = "ohos", feature = "links"))]
+                    {
+                        use winit::platform::ohos::{
+                            WindowExtOpenHarmony as _, plugins::url::UrlExt as _,
+                        };
+                        let app = window.openharmony_app().clone();
+                        let url = open_url.url.clone();
+                        winit::platform::ohos::task::spawn(async move {
+                            if let Err(err) = app.open_url(url).await {
+                                log::warn!("Failed to open url on OpenHarmony: {err}");
+                            }
+                        });
+                    }
+                    #[cfg(not(all(target_env = "ohos", feature = "links")))]
                     open_url_in_browser(&open_url.url);
                 }
             }
@@ -3397,6 +3557,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         ))]
         let wayland_ime_window = ime_surrounding::is_wayland_window(window);
 
@@ -3408,6 +3569,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         ))]
         let (allow_ime, is_toggling_ime) = if wayland_ime_window {
             let transition = self.ime_gate.transition(ime_requested, self.allow_ime);
@@ -3422,6 +3584,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         )))]
         let (allow_ime, is_toggling_ime) = (ime_requested, self.allow_ime != ime_requested);
         #[cfg(all(
@@ -3431,10 +3594,15 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         ))]
         let mut ime_context_was_reset = is_toggling_ime;
         if is_toggling_ime {
             self.allow_ime = allow_ime;
+            #[cfg(target_env = "ohos")]
+            {
+                self.ohos_ime_surrounding = None;
+            }
             #[cfg(target_os = "windows")]
             if !self.allow_ime {
                 // Defensively clear the set to avoid unexpected behavior.
@@ -3460,6 +3628,10 @@ impl State {
                 .as_ref()
                 .is_some_and(|ime| ime.should_interrupt_composition && ime.reset_request.is_none());
         if reset_request.is_some() || stock_interrupt {
+            #[cfg(target_env = "ohos")]
+            {
+                self.ohos_ime_surrounding = None;
+            }
             if let Some(request) = reset_request {
                 window.reset_ime_with_request(request.as_u64());
             } else {
@@ -3474,6 +3646,7 @@ impl State {
                 not(target_os = "android"),
                 not(target_os = "emscripten"),
                 not(target_os = "redox"),
+                not(target_env = "ohos"),
             ))]
             {
                 ime_context_was_reset = true;
@@ -3508,6 +3681,30 @@ impl State {
             self.ime_cursor_rect_px = None;
         }
 
+        #[cfg(target_env = "ohos")]
+        if let Some(ime) = &ime {
+            let (text, cursor, anchor) = if ime.purpose == egui::IMEPurpose::Password {
+                ("", 0, 0)
+            } else if let Some(payload) = ime.surrounding_text.available() {
+                (payload.text.as_str(), payload.cursor, payload.anchor)
+            } else {
+                ("", 0, 0)
+            };
+            let unchanged = self.ohos_ime_surrounding.as_ref().is_some_and(
+                |(cached_text, cached_cursor, cached_anchor)| {
+                    cached_text == text && *cached_cursor == cursor && *cached_anchor == anchor
+                },
+            );
+            if !unchanged {
+                use winit::platform::ohos::WindowExtOpenHarmony as _;
+                let owned = text.to_owned();
+                window.set_ime_surrounding_text(owned.clone(), cursor, anchor);
+                self.ohos_ime_surrounding = Some((owned, cursor, anchor));
+            }
+        } else {
+            self.ohos_ime_surrounding = None;
+        }
+
         #[cfg(all(
             feature = "wayland",
             unix,
@@ -3515,6 +3712,7 @@ impl State {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         ))]
         {
             if ime_context_was_reset {
@@ -3726,6 +3924,7 @@ pub fn update_viewport_info(
     viewport_info.focused = Some(window.has_focus());
 }
 
+#[cfg(not(all(target_env = "ohos", feature = "links")))]
 fn open_url_in_browser(_url: &str) {
     #[cfg(feature = "webbrowser")]
     if let Err(err) = webbrowser::open(_url) {
@@ -3850,6 +4049,7 @@ fn ime_delete_surrounding(window: &Window) -> Option<(usize, usize)> {
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
     ))]
     {
         use winit::platform::wayland::WindowExtWayland as _;
@@ -3866,6 +4066,7 @@ fn ime_delete_surrounding(window: &Window) -> Option<(usize, usize)> {
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
         )
     )))]
     {
@@ -3897,6 +4098,7 @@ fn latin_key(
     not(target_os = "android"),
     not(target_os = "emscripten"),
     not(target_os = "redox"),
+    not(target_env = "ohos"),
     any(feature = "x11", feature = "wayland")
 ))]
 fn latin_key(
@@ -3921,6 +4123,7 @@ fn latin_key(
         not(target_os = "android"),
         not(target_os = "emscripten"),
         not(target_os = "redox"),
+        not(target_env = "ohos"),
         any(feature = "x11", feature = "wayland")
     )
 )))]
@@ -3941,6 +4144,7 @@ fn latin_key(
             not(target_os = "android"),
             not(target_os = "emscripten"),
             not(target_os = "redox"),
+            not(target_env = "ohos"),
             any(feature = "x11", feature = "wayland")
         )
     )),
@@ -4547,6 +4751,7 @@ fn process_viewport_command(
                     not(target_os = "android"),
                     not(target_os = "emscripten"),
                     not(target_os = "redox"),
+                    not(target_env = "ohos"),
                 ))]
                 if ime_surrounding::is_wayland_window(window) {
                     // A changed purpose is a real context boundary. An unchanged command above
@@ -4827,7 +5032,7 @@ pub fn create_winit_window_attributes(
         window_attributes = window_attributes.with_window_icon(winit_icon);
     }
 
-    #[cfg(all(feature = "wayland", target_os = "linux"))]
+    #[cfg(all(feature = "wayland", target_os = "linux", not(target_env = "ohos")))]
     if let Some(app_id) = _app_id {
         use winit::platform::wayland::WindowAttributesExtWayland as _;
         window_attributes = window_attributes.with_name(app_id, "");
@@ -4847,7 +5052,11 @@ pub fn create_winit_window_attributes(
     // The variables are cleared once read, per the startup-notification
     // spec: a token is single-use, and leaving it in the environment would
     // have every later window — and every child process — replay it.
-    #[cfg(all(target_os = "linux", any(feature = "wayland", feature = "x11")))]
+    #[cfg(all(
+        target_os = "linux",
+        not(target_env = "ohos"),
+        any(feature = "wayland", feature = "x11")
+    ))]
     {
         use winit::platform::startup_notify::{
             WindowAttributesExtStartupNotify as _, reset_activation_token_env,
@@ -4864,7 +5073,7 @@ pub fn create_winit_window_attributes(
         }
     }
 
-    #[cfg(all(feature = "x11", target_os = "linux"))]
+    #[cfg(all(feature = "x11", target_os = "linux", not(target_env = "ohos")))]
     {
         use winit::platform::x11::WindowAttributesExtX11 as _;
         if let Some(window_type) = _window_type {

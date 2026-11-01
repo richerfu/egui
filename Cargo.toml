@@ -99,7 +99,7 @@ fontique = { version = "0.11.1", default-features = false, features = [
   "fontconfig-dlopen", # Load libfontconfig at runtime, so builds don't need its headers
 ] }
 glow = "0.17.0" # Can't update to 0.18: wgpu 30's wgpu-hal pins glow 0.17, so bumping splits it into two versions
-glutin = { version = "0.32.3", default-features = false }
+glutin = { version = "=0.32.2", default-features = false }
 glutin-winit = { version = "0.5.0", default-features = false }
 harfrust = "0.12.0" # Can't update to 0.13: it needs read-fonts 0.43, but fontique 0.11 pins read-fonts 0.41, so bumping splits read-fonts into two versions
 image = { version = "0.25.10", default-features = false } # `flate2` is held at 1.1.9 in `Cargo.lock`: 1.1.10 moved to miniz_oxide 0.9, duplicating the 0.8 that png needs
@@ -172,11 +172,19 @@ webbrowser = "1.2.4" # 1.2.2 fixes RUSTSEC-2026-0257 (`BROWSER` argument injecti
 wgpu = { version = "30.0", default-features = false, features = ["std"] }
 windows-sys = "0.61.2"
 winit = { version = "0.30.13", default-features = false }
+openharmony-ability = { git = "https://github.com/harmony-contrib/openharmony-ability.git", rev = "f0c98ec1c40c1576acd1c999c75865c4c19ddec4" }
+openharmony-ability-derive = { git = "https://github.com/harmony-contrib/openharmony-ability.git", rev = "f0c98ec1c40c1576acd1c999c75865c4c19ddec4" }
 
-# The Craft suite's reviewed immutable winit fork, including native lifecycle, clipboard,
-# IME and Latin-letter shortcut support.
+# The Craft suite's reviewed immutable winit fork, extended with OpenHarmony lifecycle,
+# clipboard, IME (including ordered IME reset completion), and Latin-letter shortcut support.
 [patch.crates-io]
-winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }
+winit = { path = "../winit" }
+glutin = { path = "../glutin/glutin" }
+glutin-winit = { path = "../glutin/glutin-winit" }
+# Remote equivalents when building without sibling checkouts:
+# winit = { git = "https://github.com/richerfu/winit.git", branch = "feat-openharmony" }
+# glutin = { git = "https://github.com/richerfu/glutin.git", branch = "master" }
+# glutin-winit = { git = "https://github.com/richerfu/glutin.git", branch = "master" }
 
 [workspace.lints.rust]
 unsafe_code = "deny"

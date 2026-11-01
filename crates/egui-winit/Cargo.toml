@@ -74,9 +74,6 @@ winit = { workspace = true, default-features = false }
 
 #! ### Optional dependencies
 
-# feature accesskit
-accesskit_winit = { workspace = true, optional = true }
-
 bytemuck = { workspace = true, optional = true }
 
 ## Enable this when generating docs.
@@ -87,6 +84,19 @@ webbrowser = { workspace = true, optional = true }
 
 # feature clipboard-image
 image = { workspace = true, default-features = false, features = ["png"], optional = true }
+
+# feature accesskit
+[target.'cfg(not(target_env = "ohos"))'.dependencies]
+accesskit_winit = { workspace = true, optional = true, default-features = false, features = [
+  "accesskit_unix",
+  "async-io",
+  "rwh_06",
+] }
+
+[target.'cfg(target_env = "ohos")'.dependencies]
+accesskit_winit = { workspace = true, optional = true, default-features = false, features = [
+  "rwh_06",
+] }
 
 # TODO(emilk): remove these once we are on a winit with https://github.com/rust-windowing/winit/pull/4732
 [target.'cfg(target_os = "macos")'.dependencies]
@@ -123,7 +133,7 @@ windows-sys = { workspace = true, features = [
   "Win32_UI_WindowsAndMessaging",
 ] }
 
-[target.'cfg(any(target_os="linux", target_os="dragonfly", target_os="freebsd", target_os="netbsd", target_os="openbsd"))'.dependencies]
+[target.'cfg(all(not(target_env = "ohos"), any(target_os="linux", target_os="dragonfly", target_os="freebsd", target_os="netbsd", target_os="openbsd")))'.dependencies]
 smithay-clipboard = { workspace = true, optional = true }
 parking_lot = { workspace = true, optional = true }
 
@@ -132,10 +142,10 @@ parking_lot = { workspace = true, optional = true }
 # a slightly newer version. Remove this when winit upgrades past this version.
 wayland-cursor = { workspace = true, optional = true }
 
-[target.'cfg(not(target_os = "android"))'.dependencies]
+[target.'cfg(not(any(target_os = "android", target_env = "ohos")))'.dependencies]
 arboard = { workspace = true, optional = true, features = ["image-data"] }
 
-[target.'cfg(target_os = "linux")'.dev-dependencies]
+[target.'cfg(all(target_os = "linux", not(target_env = "ohos")))'.dev-dependencies]
 # The opt-in native clipboard probe maps a real private-compositor window without a GPU.
 softbuffer = { version = "0.4.8", default-features = false, features = ["wayland", "wayland-dlopen"] }
 
